@@ -390,16 +390,69 @@ class PengajuanPerubahanController extends Controller
             $pegawaiPayload['foto'] = $request->file('foto')->store('pengajuan/foto', 'public');
         }
 
-        $payload = [
-            'pegawai' => $pegawaiPayload,
-        ];
+       $payload = [];
 
-        foreach ($this->sectionKeys() as $key) {
-            if ($request->has($key)) {
-                $payload[$key] = $this->cleanRows($request->input($key, []));
-            }
-        }
+/*
+|--------------------------------------------------------------------------
+| Informasi Pribadi
+|--------------------------------------------------------------------------
+*/
+$pegawaiChanges = [];
 
+foreach ($pegawaiPayload as $field => $newValue) {
+
+    $oldValue = $pegawai->{$field} ?? null;
+
+    if ((string) $oldValue !== (string) $newValue) {
+        $pegawaiChanges[$field] = $newValue;
+    }
+}
+
+if (!empty($pegawaiChanges)) {
+    $payload['pegawai'] = $pegawaiChanges;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Section Detail
+|--------------------------------------------------------------------------
+*/
+foreach ($this->sectionKeys() as $key) {
+
+    $newRows = $this->cleanRows($request->input($key, []));
+
+    $relationMap = [
+        'pendidikan' => 'pendidikan',
+        'kursus'     => 'kursus',
+        'peng_bsp'   => 'pengalamanBsp',
+        'peng_luar'  => 'pengalamanLuarBsp',
+        'keluarga'   => 'keluarga',
+        'penilaian'  => 'penilaian',
+    ];
+
+    $relation = $relationMap[$key];
+
+    $oldRows = $pegawai->{$relation}
+        ->map(fn($item) => collect($item->toArray())
+            ->except([
+                'created_at',
+                'updated_at',
+                'nip',
+            ])
+            ->toArray()
+        )
+        ->values()
+        ->toArray();
+
+    if ($newRows != $oldRows) {
+        $payload[$key] = $newRows;
+    }
+}
+if (empty($payload)) {
+    return back()->withErrors([
+        'pengajuan' => 'Tidak ada perubahan data yang diajukan.'
+    ]);
+}
         PengajuanPerubahan::create([
             'nip'              => $nip,
             'jenis'            => 'perubahan_data',

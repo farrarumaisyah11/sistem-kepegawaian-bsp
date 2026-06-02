@@ -785,8 +785,9 @@
             icon: 'success',
             title: 'Berhasil',
             text: @json(session('success')),
-            confirmButtonText: 'OK',
-            confirmButtonColor: '#6b775c'
+            timer: 5000,
+            timerProgressBar: true,
+            showConfirmButton: false
         });
     });
 </script>
