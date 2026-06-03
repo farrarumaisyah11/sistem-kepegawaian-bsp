@@ -4,6 +4,8 @@
 
 @section('content')
 @php
+    \Carbon\Carbon::setLocale('id');
+
     $pegawaiPayload = $payload['pegawai'] ?? [];
 
     $sectionLabels = [
@@ -147,6 +149,14 @@
     $jenisLabel = $pengajuan->jenis === 'buat_baru' ? 'Buat Baru' : 'Update / Replace';
     $totalSection = collect(['pendidikan','kursus','peng_bsp','peng_luar','keluarga','penilaian'])
         ->sum(fn($key) => count($payload[$key] ?? []));
+
+    $tanggalPengajuan = $pengajuan->created_at
+        ? $pengajuan->created_at->locale('id')->translatedFormat('d F Y')
+        : '-';
+
+    $jamPengajuan = $pengajuan->created_at
+        ? $pengajuan->created_at->format('H:i') . ' WIB'
+        : '-';
 @endphp
 
 <div class="review-page">
@@ -183,7 +193,6 @@
     <div class="hero-card mb-4">
         <div class="hero-content">
             <div class="hero-title-wrap">
-                <span class="hero-icon"><i class="bi bi-file-earmark-text"></i></span>
                 <div>
                     <div class="eyebrow">Review Pengajuan</div>
                     <h2 class="hero-title">Detail Pengajuan Perubahan</h2>
@@ -195,8 +204,8 @@
 
             <div class="submitted-card">
                 <div class="submitted-label">Tanggal Pengajuan</div>
-                <div class="submitted-value">{{ optional($pengajuan->created_at)->format('d/m/Y') ?? '-' }}</div>
-                <div class="submitted-time">{{ optional($pengajuan->created_at)->format('H:i') ?? '-' }} WIB</div>
+                <div class="submitted-value">{{ $tanggalPengajuan }}</div>
+                <div class="submitted-time">{{ $jamPengajuan }}</div>
             </div>
         </div>
 
@@ -297,6 +306,7 @@
 
     @php
         $sectionNo = !empty($pegawaiPayload) ? 2 : 1;
+        $globalDataNo = 1;
     @endphp
 
     @foreach(['pendidikan','kursus','peng_bsp','peng_luar','keluarga','penilaian'] as $sectionKey)
@@ -321,10 +331,13 @@
             </div>
 
             <div class="data-card-body">
-                @foreach($rows as $index => $row)
+                @foreach($rows as $row)
                     <div class="detail-block">
                         <div class="detail-block-header">
-                            <span>Data #{{ $index + 1 }}</span>
+                            <span>Data {{ $globalDataNo }}</span>
+                            @php
+                                $globalDataNo++;
+                            @endphp
                         </div>
 
                         <div class="table-responsive">
@@ -390,7 +403,7 @@
                         </button>
                     </form>
 
-                    <form action="{{ route(auth()->user()->role.'.pengajuan.tolak', $pengajuan) }}" method="POST" class="decision-panel reject-panel" onsubmit="return confirm('Tolak pengajuan ini?')">
+                    <form action="{{ route(auth()->user()->role.'.pengajuan.tolak', $pengajuan) }}" method="POST" class="decision-panel reject-panel js-reject-form">
                         @csrf
                         @method('PATCH')
                         <div class="decision-title">
@@ -1174,50 +1187,111 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const approveForm = document.querySelector('.js-approve-form');
+        const rejectForm = document.querySelector('.js-reject-form');
 
-        if (!approveForm || typeof Swal === 'undefined') {
+        if (typeof Swal === 'undefined') {
             return;
         }
 
-        approveForm.addEventListener('submit', function (event) {
-            event.preventDefault();
+        if (approveForm) {
+            approveForm.addEventListener('submit', function (event) {
+                event.preventDefault();
 
-            Swal.fire({
-                icon: 'question',
-                title: 'Approve Pengajuan?',
-                text: 'Data pengajuan akan disimpan ke database pegawai.',
-                showCancelButton: true,
-                confirmButtonText: 'Ya, Approve',
-                cancelButtonText: 'Batal',
-                confirmButtonColor: '#15803d',
-                cancelButtonColor: '#6b7280',
-                reverseButtons: true,
-                focusCancel: true
-            }).then((result) => {
-                if (!result.isConfirmed) {
+                Swal.fire({
+                    icon: 'question',
+                    title: 'Approve Pengajuan?',
+                    text: 'Data pengajuan akan disimpan ke database pegawai.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Approve',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#15803d',
+                    cancelButtonColor: '#6b7280',
+                    reverseButtons: true,
+                    focusCancel: true
+                }).then((result) => {
+                    if (!result.isConfirmed) {
+                        return;
+                    }
+
+                    const submitButton = approveForm.querySelector('button[type="submit"]');
+
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+
+                    Swal.fire({
+                        title: 'Memproses Approve',
+                        text: 'Mohon tunggu sebentar.',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        showConfirmButton: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    approveForm.submit();
+                });
+            });
+        }
+
+        if (rejectForm) {
+            rejectForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                const textarea = rejectForm.querySelector('textarea[name="catatan_reviewer"]');
+
+                if (textarea && !textarea.value.trim()) {
+                    textarea.focus();
+
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Alasan Penolakan Wajib Diisi',
+                        text: 'Silakan isi alasan penolakan terlebih dahulu.',
+                        confirmButtonText: 'Mengerti',
+                        confirmButtonColor: '#dc2626'
+                    });
+
                     return;
                 }
 
-                const submitButton = approveForm.querySelector('button[type="submit"]');
-
-                if (submitButton) {
-                    submitButton.disabled = true;
-                }
-
                 Swal.fire({
-                    title: 'Memproses Approve',
-                    text: 'Mohon tunggu sebentar.',
-                    allowOutsideClick: false,
-                    allowEscapeKey: false,
-                    showConfirmButton: false,
-                    didOpen: () => {
-                        Swal.showLoading();
+                    icon: 'warning',
+                    title: 'Tolak Pengajuan?',
+                    text: 'Pengajuan akan ditolak dan statusnya menjadi final.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Tolak',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#dc2626',
+                    cancelButtonColor: '#6b7280',
+                    reverseButtons: true,
+                    focusCancel: true
+                }).then((result) => {
+                    if (!result.isConfirmed) {
+                        return;
                     }
-                });
 
-                approveForm.submit();
+                    const submitButton = rejectForm.querySelector('button[type="submit"]');
+
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                    }
+
+                    Swal.fire({
+                        title: 'Memproses Penolakan',
+                        text: 'Mohon tunggu sebentar.',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        showConfirmButton: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    rejectForm.submit();
+                });
             });
-        });
+        }
     });
 </script>
 @endpush

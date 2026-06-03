@@ -181,8 +181,13 @@
                                     <td>{{ $pegawai->status ?? '-' }}</td>
                                 </tr>
                                 <tr>
+                                    <tr>
                                     <th>Hubungan Kerja</th>
                                     <td>{{ $pegawai->hubungan_kerja ?? '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Lokasi Kerja</th>
+                                    <td>{{ $pegawai->lokasi_kerja ?? '-' }}</td>
                                 </tr>
                                 <tr>
                                     <th>Tanggal Mulai Kerja</th>

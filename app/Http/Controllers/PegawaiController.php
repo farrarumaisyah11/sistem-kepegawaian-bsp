@@ -391,7 +391,10 @@ protected function preparePegawaiData(
         'jabatan'         => $selectedJabatan?->nama_jabatan ?? null,
         'departemen'      => $selectedJabatan?->departemen ?? ($validated['departemen'] ?? null),
         'gol_jabatan'     => $golJabatan,
-        'lokasi_kerja'    => $selectedJabatan?->lokasi_kerja ?? ($validated['lokasi_kerja'] ?? null),
+
+        // INI YANG DIPERBAIKI:
+        // Lokasi dari form diprioritaskan, baru fallback ke master jabatan.
+        'lokasi_kerja'    => $validated['lokasi_kerja'] ?? $selectedJabatan?->lokasi_kerja ?? null,
 
         'tmt_gol_jabatan' => $validated['tmt_gol_jabatan'] ?? null,
         'tmt_gol_upah'    => $validated['tmt_gol_upah'] ?? null,

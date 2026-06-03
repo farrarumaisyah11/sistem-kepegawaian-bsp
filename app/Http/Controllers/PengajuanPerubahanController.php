@@ -11,11 +11,6 @@ use Illuminate\Validation\ValidationException;
 
 class PengajuanPerubahanController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | INDEX REVIEWER: ADMIN / HCM
-    |--------------------------------------------------------------------------
-    */
     public function indexReviewer(Request $request)
     {
         $this->authorizeReviewer();
@@ -36,11 +31,6 @@ class PengajuanPerubahanController extends Controller
         return view('pengajuan.reviewer.index', compact('pengajuanAktif', 'riwayatPengajuan'));
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SHOW REVIEWER: ADMIN / HCM
-    |--------------------------------------------------------------------------
-    */
     public function showReviewer(PengajuanPerubahan $pengajuan)
     {
         $this->authorizeReviewer();
@@ -61,11 +51,6 @@ class PengajuanPerubahanController extends Controller
         return view('pengajuan.reviewer.show', compact('pengajuan', 'payload'));
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | TANDAI DIPROSES
-    |--------------------------------------------------------------------------
-    */
     public function proses(PengajuanPerubahan $pengajuan)
     {
         $this->authorizeReviewer();
@@ -86,11 +71,6 @@ class PengajuanPerubahanController extends Controller
         return back()->with('success', 'Pengajuan berhasil ditandai sedang diproses.');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | TERIMA / APPROVE
-    |--------------------------------------------------------------------------
-    */
     public function terima(Request $request, PengajuanPerubahan $pengajuan)
     {
         $this->authorizeReviewer();
@@ -119,14 +99,14 @@ class PengajuanPerubahanController extends Controller
 
         return redirect()
             ->route(auth()->user()->role . '.pengajuan.index')
-            ->with('success', 'Pengajuan diterima. Data pegawai berhasil diperbarui.');
+            ->with('swal', [
+                'icon' => 'success',
+                'title' => 'Pengajuan Berhasil Di-approve',
+                'text' => 'Data pegawai berhasil diperbarui dan disimpan ke database.',
+                'timer' => 5000,
+            ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | TOLAK
-    |--------------------------------------------------------------------------
-    */
     public function tolak(Request $request, PengajuanPerubahan $pengajuan)
     {
         $this->authorizeReviewer();
@@ -151,14 +131,14 @@ class PengajuanPerubahanController extends Controller
 
         return redirect()
             ->route(auth()->user()->role . '.pengajuan.index')
-            ->with('success', 'Pengajuan berhasil ditolak.');
+            ->with('swal', [
+                'icon' => 'error',
+                'title' => 'Pengajuan Ditolak',
+                'text' => 'Pengajuan berhasil ditolak.',
+                'timer' => 5000,
+            ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | HAPUS PENGAJUAN REVIEWER
-    |--------------------------------------------------------------------------
-    */
     public function destroyReviewer(PengajuanPerubahan $pengajuan)
     {
         $this->authorizeReviewer();
@@ -168,11 +148,6 @@ class PengajuanPerubahanController extends Controller
         return back()->with('success', 'Pengajuan berhasil dihapus.');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | INDEX PEGAWAI
-    |--------------------------------------------------------------------------
-    */
     public function indexPegawai(Request $request)
     {
         $user = auth()->user();
@@ -189,11 +164,6 @@ class PengajuanPerubahanController extends Controller
         return view('pengajuan.pegawai.index', compact('list'));
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | FORM CREATE PENGAJUAN PEGAWAI
-    |--------------------------------------------------------------------------
-    */
     public function createPegawai()
     {
         $user = auth()->user();
@@ -220,21 +190,11 @@ class PengajuanPerubahanController extends Controller
         return view('pengajuan.pegawai.create', compact('pegawai', 'jabatans'));
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | STORE PENGAJUAN PEGAWAI
-    |--------------------------------------------------------------------------
-    */
     public function storePegawai(Request $request)
     {
         return $this->savePengajuan($request);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SHOW PEGAWAI
-    |--------------------------------------------------------------------------
-    */
     public function showPegawai(PengajuanPerubahan $pengajuan)
     {
         $user = auth()->user();
@@ -250,11 +210,6 @@ class PengajuanPerubahanController extends Controller
         return view('pengajuan.pegawai.show', compact('pengajuan', 'payload'));
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ALIAS METHOD BIAR AMAN JIKA ADA ROUTE LAMA
-    |--------------------------------------------------------------------------
-    */
     public function index(Request $request)
     {
         if (in_array(auth()->user()->role, ['admin', 'hcm'])) {
@@ -293,11 +248,6 @@ class PengajuanPerubahanController extends Controller
         return $this->destroyReviewer($pengajuan);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SIMPAN PENGAJUAN KE DRAFT / TABEL PENGAJUAN
-    |--------------------------------------------------------------------------
-    */
     private function savePengajuan(Request $request)
     {
         $user = auth()->user();
@@ -356,13 +306,6 @@ class PengajuanPerubahanController extends Controller
             'catatan_pegawai'  => 'nullable|string',
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Ambil data jabatan dari master tb_jabatan
-        | Jika pegawai memilih id_jabatan, maka jabatan/departemen/gol/lokasi
-        | disesuaikan dengan master jabatan agar data tidak beda-beda.
-        |--------------------------------------------------------------------------
-        */
         $selectedJabatan = $this->resolveSelectedJabatan($request);
 
         if ($selectedJabatan) {
@@ -390,69 +333,59 @@ class PengajuanPerubahanController extends Controller
             $pegawaiPayload['foto'] = $request->file('foto')->store('pengajuan/foto', 'public');
         }
 
-       $payload = [];
+        $payload = [];
 
-/*
-|--------------------------------------------------------------------------
-| Informasi Pribadi
-|--------------------------------------------------------------------------
-*/
-$pegawaiChanges = [];
+        $pegawaiChanges = [];
 
-foreach ($pegawaiPayload as $field => $newValue) {
+        foreach ($pegawaiPayload as $field => $newValue) {
+            $oldValue = $pegawai->{$field} ?? null;
 
-    $oldValue = $pegawai->{$field} ?? null;
+            if ((string) $oldValue !== (string) $newValue) {
+                $pegawaiChanges[$field] = $newValue;
+            }
+        }
 
-    if ((string) $oldValue !== (string) $newValue) {
-        $pegawaiChanges[$field] = $newValue;
-    }
-}
+        if (!empty($pegawaiChanges)) {
+            $payload['pegawai'] = $pegawaiChanges;
+        }
 
-if (!empty($pegawaiChanges)) {
-    $payload['pegawai'] = $pegawaiChanges;
-}
+        foreach ($this->sectionKeys() as $key) {
+            $newRows = $this->cleanRows($request->input($key, []));
 
-/*
-|--------------------------------------------------------------------------
-| Section Detail
-|--------------------------------------------------------------------------
-*/
-foreach ($this->sectionKeys() as $key) {
+            $relationMap = [
+                'pendidikan' => 'pendidikan',
+                'kursus'     => 'kursus',
+                'peng_bsp'   => 'pengalamanBsp',
+                'peng_luar'  => 'pengalamanLuarBsp',
+                'keluarga'   => 'keluarga',
+                'penilaian'  => 'penilaian',
+            ];
 
-    $newRows = $this->cleanRows($request->input($key, []));
+            $relation = $relationMap[$key];
 
-    $relationMap = [
-        'pendidikan' => 'pendidikan',
-        'kursus'     => 'kursus',
-        'peng_bsp'   => 'pengalamanBsp',
-        'peng_luar'  => 'pengalamanLuarBsp',
-        'keluarga'   => 'keluarga',
-        'penilaian'  => 'penilaian',
-    ];
+            $oldRows = $pegawai->{$relation}
+                ->map(fn($item) => collect($item->toArray())
+                    ->except([
+                        'created_at',
+                        'updated_at',
+                        'nip',
+                    ])
+                    ->toArray()
+                )
+                ->values()
+                ->toArray();
 
-    $relation = $relationMap[$key];
+            if ($newRows != $oldRows) {
+                $payload[$key] = $newRows;
+            }
+        }
 
-    $oldRows = $pegawai->{$relation}
-        ->map(fn($item) => collect($item->toArray())
-            ->except([
-                'created_at',
-                'updated_at',
-                'nip',
-            ])
-            ->toArray()
-        )
-        ->values()
-        ->toArray();
+        if (empty($payload)) {
+            return back()->withErrors([
+                'pengajuan' => 'Tidak ada perubahan data yang diajukan.'
+            ]);
+        }
 
-    if ($newRows != $oldRows) {
-        $payload[$key] = $newRows;
-    }
-}
-if (empty($payload)) {
-    return back()->withErrors([
-        'pengajuan' => 'Tidak ada perubahan data yang diajukan.'
-    ]);
-}
         PengajuanPerubahan::create([
             'nip'              => $nip,
             'jenis'            => 'perubahan_data',
@@ -469,11 +402,6 @@ if (empty($payload)) {
             ->with('success', 'Pengajuan perubahan berhasil dikirim dan menunggu persetujuan HCM/Admin.');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | APPLY DATA KE TABEL UTAMA SETELAH APPROVE
-    |--------------------------------------------------------------------------
-    */
     private function applyPayloadToPegawai(PengajuanPerubahan $pengajuan): void
     {
         $payload = $pengajuan->payload ?? [];
