@@ -663,7 +663,47 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    @if(session('success_auto_redirect'))
+        showAutoRedirectSuccess(
+            @json(session('success_auto_redirect')),
+            @json(session('success_redirect_url'))
+        );
+    @endif
 });
+
+function loadSweetAlert(callback) {
+    if (window.Swal) {
+        callback();
+        return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
+    script.onload = callback;
+    document.head.appendChild(script);
+}
+
+function showAutoRedirectSuccess(message, redirectUrl) {
+    loadSweetAlert(function () {
+        Swal.fire({
+            icon: 'success',
+            title: 'Berhasil',
+            text: message,
+            timer: 1500,
+            timerProgressBar: true,
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            backdrop: true,
+            didClose: () => {
+                if (redirectUrl) {
+                    window.location.href = redirectUrl;
+                }
+            }
+        });
+    });
+}
 
 function showSection(id){
     document.querySelectorAll('.section').forEach(section => {

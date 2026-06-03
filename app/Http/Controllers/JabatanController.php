@@ -59,7 +59,7 @@ class JabatanController extends Controller
 
         return redirect()
             ->route($this->routeName('jabatan.show'), $jabatan)
-            ->with('success', 'Data jabatan berhasil disimpan.');
+            ->with('success_auto', 'Data jabatan berhasil disimpan.');
     }
 
     public function show(Jabatan $jabatan)
@@ -102,7 +102,7 @@ class JabatanController extends Controller
 
         return redirect()
             ->route($this->routeName('jabatan.show'), $jabatan)
-            ->with('success', 'Data jabatan berhasil diperbarui.');
+            ->with('success_auto', 'Data jabatan berhasil diperbarui.');
     }
 
     public function destroy(Jabatan $jabatan)
@@ -123,7 +123,7 @@ class JabatanController extends Controller
 
         return redirect()
             ->route($this->routeName('jabatan.index'))
-            ->with('success', 'Data jabatan berhasil dihapus.');
+            ->with('success_auto', 'Data jabatan berhasil dihapus.');
     }
 
     public function print(Jabatan $jabatan)
@@ -237,118 +237,118 @@ class JabatanController extends Controller
 
         return count($lines) ? implode("\n", $lines) : null;
     }
-public function approvalPage(Jabatan $jabatan)
-{
-    abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
 
-    $jabatan = $this->ensureApprovalToken($jabatan);
+    public function approvalPage(Jabatan $jabatan)
+    {
+        abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
 
-    return view('jabatan.approval-page', compact('jabatan'));
-}
+        $jabatan = $this->ensureApprovalToken($jabatan);
 
-public function approvalQr(Jabatan $jabatan)
-{
-    abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
-
-    $jabatan = $this->ensureApprovalToken($jabatan);
-
-    /*
-    |--------------------------------------------------------------------------
-    | URL approval yang masuk ke QR
-    |--------------------------------------------------------------------------
-    | Pakai APP_URL agar QR bisa discan dari HP.
-    | Kalau APP_URL masih 127.0.0.1, HP tidak akan bisa buka linknya.
-    */
-    $approvalPath = route('jabatan.approval.scan', [
-        'jabatan' => $jabatan->id_jabatan,
-        'token'   => $jabatan->approval_token,
-    ], false);
-
-    $approvalUrl = rtrim(config('app.url'), '/') . $approvalPath;
-
-    $qrSvg = QrCode::format('svg')
-        ->size(260)
-        ->margin(2)
-        ->errorCorrection('M')
-        ->generate($approvalUrl);
-
-    return response($qrSvg, 200)
-        ->header('Content-Type', 'image/svg+xml')
-        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-}
-
-private function ensureApprovalToken(Jabatan $jabatan): Jabatan
-{
-    if (empty($jabatan->approval_token)) {
-        $jabatan->forceFill([
-            'approval_token' => (string) Str::uuid(),
-        ])->save();
-
-        $jabatan->refresh();
+        return view('jabatan.approval-page', compact('jabatan'));
     }
 
-    return $jabatan;
-}
+    public function approvalQr(Jabatan $jabatan)
+    {
+        abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
 
-public function approvalScan(Jabatan $jabatan, string $token)
-{
-    abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
+        $jabatan = $this->ensureApprovalToken($jabatan);
 
-    abort_unless(
-        $jabatan->approval_token && hash_equals($jabatan->approval_token, $token),
-        403,
-        'Token approval tidak valid.'
-    );
+        /*
+        |--------------------------------------------------------------------------
+        | URL approval yang masuk ke QR
+        |--------------------------------------------------------------------------
+        | Pakai APP_URL agar QR bisa discan dari HP.
+        | Kalau APP_URL masih 127.0.0.1, HP tidak akan bisa buka linknya.
+        */
+        $approvalPath = route('jabatan.approval.scan', [
+            'jabatan' => $jabatan->id_jabatan,
+            'token'   => $jabatan->approval_token,
+        ], false);
 
-    $user = auth()->user();
+        $approvalUrl = rtrim(config('app.url'), '/') . $approvalPath;
 
-    $nipUser = $user->nip ?? $user->username ?? null;
+        $qrSvg = QrCode::format('svg')
+            ->size(260)
+            ->margin(2)
+            ->errorCorrection('M')
+            ->generate($approvalUrl);
 
-    $pegawaiApprover = $nipUser
-        ? Pegawai::where('nip', $nipUser)->first()
-        : null;
+        return response($qrSvg, 200)
+            ->header('Content-Type', 'image/svg+xml')
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
 
-    return view('jabatan.approval-scan', compact('jabatan', 'user', 'pegawaiApprover', 'token'));
-}
+    private function ensureApprovalToken(Jabatan $jabatan): Jabatan
+    {
+        if (empty($jabatan->approval_token)) {
+            $jabatan->forceFill([
+                'approval_token' => (string) Str::uuid(),
+            ])->save();
 
-public function approvalApprove(Request $request, Jabatan $jabatan, string $token)
-{
-    abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
+            $jabatan->refresh();
+        }
 
-    abort_unless(
-        $jabatan->approval_token && hash_equals($jabatan->approval_token, $token),
-        403,
-        'Token approval tidak valid.'
-    );
+        return $jabatan;
+    }
 
-    $request->validate([
-        'approval_catatan' => ['nullable', 'string'],
-    ]);
+    public function approvalScan(Jabatan $jabatan, string $token)
+    {
+        abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
 
-    $user = auth()->user();
+        abort_unless(
+            $jabatan->approval_token && hash_equals($jabatan->approval_token, $token),
+            403,
+            'Token approval tidak valid.'
+        );
 
-    $nipUser = $user->nip ?? $user->username ?? null;
+        $user = auth()->user();
 
-    $pegawaiApprover = $nipUser
-        ? Pegawai::where('nip', $nipUser)->first()
-        : null;
+        $nipUser = $user->nip ?? $user->username ?? null;
 
-    $jabatan->update([
-        'approval_status' => 'approved',
-        'approved_by' => $user->getKey(),
-        'approved_by_name' => $pegawaiApprover->nama ?? $user->username ?? 'Approver',
-        'approved_by_role' => $user->role,
-        'approved_by_jabatan' => $pegawaiApprover->jabatan ?? strtoupper($user->role),
-        'approved_by_departemen' => $pegawaiApprover->departemen ?? '-',
-        'approved_at' => now(),
-        'approval_catatan' => $request->approval_catatan,
-    ]);
+        $pegawaiApprover = $nipUser
+            ? Pegawai::where('nip', $nipUser)->first()
+            : null;
 
-    return redirect()
-        ->route($this->routeName('jabatan.show'), $jabatan)
-        ->with('success', 'Job description berhasil di-approve.');
-}
+        return view('jabatan.approval-scan', compact('jabatan', 'user', 'pegawaiApprover', 'token'));
+    }
 
+    public function approvalApprove(Request $request, Jabatan $jabatan, string $token)
+    {
+        abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
+
+        abort_unless(
+            $jabatan->approval_token && hash_equals($jabatan->approval_token, $token),
+            403,
+            'Token approval tidak valid.'
+        );
+
+        $request->validate([
+            'approval_catatan' => ['nullable', 'string'],
+        ]);
+
+        $user = auth()->user();
+
+        $nipUser = $user->nip ?? $user->username ?? null;
+
+        $pegawaiApprover = $nipUser
+            ? Pegawai::where('nip', $nipUser)->first()
+            : null;
+
+        $jabatan->update([
+            'approval_status' => 'approved',
+            'approved_by' => $user->getKey(),
+            'approved_by_name' => $pegawaiApprover->nama ?? $user->username ?? 'Approver',
+            'approved_by_role' => $user->role,
+            'approved_by_jabatan' => $pegawaiApprover->jabatan ?? strtoupper($user->role),
+            'approved_by_departemen' => $pegawaiApprover->departemen ?? '-',
+            'approved_at' => now(),
+            'approval_catatan' => $request->approval_catatan,
+        ]);
+
+        return redirect()
+            ->route($this->routeName('jabatan.show'), $jabatan)
+            ->with('success_auto', 'Job description berhasil di-approve.');
+    }
 
     private function routeName(string $name): string
     {

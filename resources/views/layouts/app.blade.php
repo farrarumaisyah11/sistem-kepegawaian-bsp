@@ -26,24 +26,21 @@
             overflow-x: hidden;
         }
 
-        /* Container utama menggunakan Flexbox */
         #layout-wrapper {
             display: flex;
             width: 100%;
             min-height: 100vh;
         }
 
-        /* Main Content Area */
         .main-content {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            min-width: 0; /* Mencegah konten meluap keluar */
+            min-width: 0;
             margin-left: var(--sidebar-width);
             transition: var(--transition);
         }
 
-        /* Kondisi Sidebar Mini */
         body.sidebar-mini .main-content {
             margin-left: var(--sidebar-mini);
         }
@@ -53,22 +50,22 @@
             flex-grow: 1;
         }
 
-        /* Responsivitas Mobile & Layar Bagi Dua */
         @media (max-width: 992px) {
             .main-content {
                 margin-left: 0 !important;
             }
+
             body.sidebar-mini .sidebar {
                 transform: translateX(-100%);
             }
         }
     </style>
+
     @stack('styles')
 </head>
-<body class="">
+<body>
 
     <div id="layout-wrapper">
-        {{-- Folder Layouts --}}
         @include('layouts.sidebar')
 
         <div class="main-content">
@@ -87,11 +84,41 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
         function toggleSidebar() {
             document.body.classList.toggle('sidebar-mini');
         }
     </script>
+
+    @if(session('success_auto'))
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        function showAutoSuccess() {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil',
+                text: @json(session('success_auto')),
+                timer: 1500,
+                timerProgressBar: true,
+                showConfirmButton: false,
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            });
+        }
+
+        if (window.Swal) {
+            showAutoSuccess();
+        } else {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/sweetalert2@11';
+            script.onload = showAutoSuccess;
+            document.head.appendChild(script);
+        }
+    });
+    </script>
+    @endif
+
     @stack('scripts')
 </body>
 </html>

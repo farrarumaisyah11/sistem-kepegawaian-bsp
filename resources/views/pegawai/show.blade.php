@@ -180,7 +180,6 @@
                                     <th>Status</th>
                                     <td>{{ $pegawai->status ?? '-' }}</td>
                                 </tr>
-                                <tr>
                                     <tr>
                                     <th>Hubungan Kerja</th>
                                     <td>{{ $pegawai->hubungan_kerja ?? '-' }}</td>

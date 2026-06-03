@@ -138,8 +138,8 @@ class PegawaiController extends Controller
         DB::commit();
 
         return redirect()
-            ->route($pegawaiPrefix . '.pegawai.index')
-            ->with('success', 'Data pegawai berhasil disimpan');
+    ->route($pegawaiPrefix . '.pegawai.index')
+    ->with('success_auto', 'Data pegawai berhasil disimpan');
 
     } catch (\Throwable $e) {
         DB::rollBack();
@@ -300,12 +300,14 @@ public function update(Request $request, Pegawai $pegawai)
         'keluarga'        => ['nullable', 'array'],
         'penilaian'       => ['nullable', 'array'],
     ]);
+
     $selectedJabatan = $this->resolveSelectedJabatan($request);
 
     DB::beginTransaction();
 
     try {
         $data = $this->preparePegawaiData($validated, $request, true, $pegawai, $selectedJabatan);
+
         // NIP lama tetap dipakai supaya relasi anak tidak putus
         $data['nip'] = $pegawai->nip;
 
@@ -317,8 +319,8 @@ public function update(Request $request, Pegawai $pegawai)
         DB::commit();
 
         return redirect()
-            ->route($pegawaiPrefix . '.pegawai.index')
-            ->with('success', 'Data pegawai berhasil diperbaharui');
+    ->route($pegawaiPrefix . '.pegawai.index')
+    ->with('success_auto', 'Data pegawai berhasil diperbaharui');
 
     } catch (\Throwable $e) {
         DB::rollBack();
@@ -350,8 +352,8 @@ public function destroy($nip)
         DB::commit();
 
         return redirect()
-            ->route($pegawaiPrefix . '.pegawai.index')
-            ->with('success', 'Data pegawai berhasil dihapus');
+    ->route($pegawaiPrefix . '.pegawai.index')
+    ->with('success_auto', 'Data pegawai berhasil dihapus');
 
     } catch (\Throwable $e) {
         DB::rollBack();
