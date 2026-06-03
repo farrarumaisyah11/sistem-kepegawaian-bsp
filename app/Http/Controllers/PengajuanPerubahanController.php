@@ -38,7 +38,7 @@ class PengajuanPerubahanController extends Controller
         if (in_array($pengajuan->status, ['diajukan', 'pending', 'belum_diolah'])) {
             $pengajuan->update([
                 'status' => 'diproses',
-                'dilihat_pada' => now(),
+                'dilihat_pada' => now('Asia/Jakarta'),
                 'id_user_proses' => auth()->user()->getKey(),
                 'role_pemroses' => auth()->user()->role,
             ]);
@@ -63,12 +63,12 @@ class PengajuanPerubahanController extends Controller
 
         $pengajuan->update([
             'status' => 'diproses',
-            'dilihat_pada' => now(),
+            'dilihat_pada' => now('Asia/Jakarta'),
             'id_user_proses' => auth()->user()->getKey(),
             'role_pemroses' => auth()->user()->role,
         ]);
 
-        return back()->with('success', 'Pengajuan berhasil ditandai sedang diproses.');
+        return back()->with('success_auto', 'Pengajuan berhasil ditandai sedang diproses.');
     }
 
     public function terima(Request $request, PengajuanPerubahan $pengajuan)
@@ -91,7 +91,7 @@ class PengajuanPerubahanController extends Controller
             $pengajuan->update([
                 'status' => 'diterima',
                 'catatan_reviewer' => $request->catatan_reviewer,
-                'diproses_pada' => now(),
+                'diproses_pada' => now('Asia/Jakarta'),
                 'id_user_proses' => auth()->user()->getKey(),
                 'role_pemroses' => auth()->user()->role,
             ]);
@@ -99,12 +99,7 @@ class PengajuanPerubahanController extends Controller
 
         return redirect()
             ->route(auth()->user()->role . '.pengajuan.index')
-            ->with('swal', [
-                'icon' => 'success',
-                'title' => 'Pengajuan Berhasil Di-approve',
-                'text' => 'Data pegawai berhasil diperbarui dan disimpan ke database.',
-                'timer' => 5000,
-            ]);
+            ->with('success_auto', 'Pengajuan berhasil di-approve. Data pegawai sudah diperbarui.');
     }
 
     public function tolak(Request $request, PengajuanPerubahan $pengajuan)
@@ -124,19 +119,14 @@ class PengajuanPerubahanController extends Controller
         $pengajuan->update([
             'status' => 'ditolak',
             'catatan_reviewer' => $request->catatan_reviewer,
-            'ditolak_pada' => now(),
+            'ditolak_pada' => now('Asia/Jakarta'),
             'id_user_proses' => auth()->user()->getKey(),
             'role_pemroses' => auth()->user()->role,
         ]);
 
         return redirect()
             ->route(auth()->user()->role . '.pengajuan.index')
-            ->with('swal', [
-                'icon' => 'error',
-                'title' => 'Pengajuan Ditolak',
-                'text' => 'Pengajuan berhasil ditolak.',
-                'timer' => 5000,
-            ]);
+            ->with('success_auto', 'Pengajuan berhasil ditolak.');
     }
 
     public function destroyReviewer(PengajuanPerubahan $pengajuan)
@@ -145,7 +135,7 @@ class PengajuanPerubahanController extends Controller
 
         $pengajuan->delete();
 
-        return back()->with('success', 'Pengajuan berhasil dihapus.');
+        return back()->with('success_auto', 'Pengajuan berhasil dihapus.');
     }
 
     public function indexPegawai(Request $request)
@@ -249,159 +239,219 @@ class PengajuanPerubahanController extends Controller
     }
 
     private function savePengajuan(Request $request)
-    {
-        $user = auth()->user();
+{
+    $user = auth()->user();
 
-        $nip = $user->role === 'pegawai'
-            ? ($user->nip ?? $user->username)
-            : $request->input('nip');
+    $nip = $user->role === 'pegawai'
+        ? ($user->nip ?? $user->username)
+        : $request->input('nip');
 
-        if (!$nip) {
-            return back()->withErrors([
-                'nip' => 'NIP tidak ditemukan.'
-            ]);
-        }
-
-        $pegawai = Pegawai::where('nip', $nip)->first();
-
-        $adaPengajuanAktif = PengajuanPerubahan::where('nip', $nip)
-            ->whereIn('status', ['diajukan', 'pending', 'belum_diolah', 'diproses'])
-            ->exists();
-
-        if ($adaPengajuanAktif) {
-            return back()->withErrors([
-                'pengajuan' => 'Masih ada pengajuan perubahan yang belum selesai diproses.'
-            ]);
-        }
-
-        $request->validate([
-            'nama'             => 'nullable|string|max:100',
-            'tempat_lahir'     => 'nullable|string|max:100',
-            'tgl_lahir'        => 'nullable|date',
-            'jenkel'           => 'nullable|string|max:20',
-            'agama'            => 'nullable|string|max:50',
-            'alamat'           => 'nullable|string',
-            'profesional'      => 'nullable|string|max:50',
-
-            'tmt_gol_jabatan'  => 'nullable|date',
-            'gol_jabatan'      => 'nullable|numeric',
-            'id_jabatan'       => 'nullable|integer|exists:tb_jabatan,id_jabatan',
-            'jabatan'          => 'nullable|string|max:100',
-            'departemen'       => 'nullable|string|max:100',
-
-            'hubungan_kerja'   => 'nullable|string|max:50',
-            'lokasi_kerja'     => 'nullable|string|max:50',
-            'status'           => 'nullable|string|max:50',
-            'tmt_gol_upah'     => 'nullable|date',
-            'gol_upah'         => 'nullable|numeric',
-            'tgl_masuk'        => 'nullable|date',
-            'foto'             => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-
-            'pendidikan'       => 'nullable|array',
-            'kursus'           => 'nullable|array',
-            'peng_bsp'         => 'nullable|array',
-            'peng_luar'        => 'nullable|array',
-            'keluarga'         => 'nullable|array',
-            'penilaian'        => 'nullable|array',
-            'catatan_pegawai'  => 'nullable|string',
+    if (!$nip) {
+        return back()->withErrors([
+            'nip' => 'NIP tidak ditemukan.'
         ]);
-
-        $selectedJabatan = $this->resolveSelectedJabatan($request);
-
-        if ($selectedJabatan) {
-            $request->merge([
-                'id_jabatan'   => $selectedJabatan->id_jabatan,
-                'jabatan'      => $selectedJabatan->nama_jabatan,
-                'departemen'   => $selectedJabatan->departemen,
-                'gol_jabatan'  => is_numeric($selectedJabatan->gol_jabatan)
-                    ? (int) $selectedJabatan->gol_jabatan
-                    : $request->input('gol_jabatan'),
-                'lokasi_kerja' => $selectedJabatan->lokasi_kerja ?: $request->input('lokasi_kerja'),
-            ]);
-        }
-
-        $pegawaiPayload = [];
-
-        foreach ($this->pegawaiFields() as $field) {
-            if ($request->has($field)) {
-                $value = $request->input($field);
-                $pegawaiPayload[$field] = $value === '' ? null : $value;
-            }
-        }
-
-        if ($request->hasFile('foto')) {
-            $pegawaiPayload['foto'] = $request->file('foto')->store('pengajuan/foto', 'public');
-        }
-
-        $payload = [];
-
-        $pegawaiChanges = [];
-
-        foreach ($pegawaiPayload as $field => $newValue) {
-            $oldValue = $pegawai->{$field} ?? null;
-
-            if ((string) $oldValue !== (string) $newValue) {
-                $pegawaiChanges[$field] = $newValue;
-            }
-        }
-
-        if (!empty($pegawaiChanges)) {
-            $payload['pegawai'] = $pegawaiChanges;
-        }
-
-        foreach ($this->sectionKeys() as $key) {
-            $newRows = $this->cleanRows($request->input($key, []));
-
-            $relationMap = [
-                'pendidikan' => 'pendidikan',
-                'kursus'     => 'kursus',
-                'peng_bsp'   => 'pengalamanBsp',
-                'peng_luar'  => 'pengalamanLuarBsp',
-                'keluarga'   => 'keluarga',
-                'penilaian'  => 'penilaian',
-            ];
-
-            $relation = $relationMap[$key];
-
-            $oldRows = $pegawai->{$relation}
-                ->map(fn($item) => collect($item->toArray())
-                    ->except([
-                        'created_at',
-                        'updated_at',
-                        'nip',
-                    ])
-                    ->toArray()
-                )
-                ->values()
-                ->toArray();
-
-            if ($newRows != $oldRows) {
-                $payload[$key] = $newRows;
-            }
-        }
-
-        if (empty($payload)) {
-            return back()->withErrors([
-                'pengajuan' => 'Tidak ada perubahan data yang diajukan.'
-            ]);
-        }
-
-        PengajuanPerubahan::create([
-            'nip'              => $nip,
-            'jenis'            => 'perubahan_data',
-            'nama_pegawai'     => $pegawaiPayload['nama'] ?? $pegawai->nama ?? null,
-            'id_user_pengaju'  => $user->getKey(),
-            'role_pengaju'     => $user->role,
-            'status'           => 'diajukan',
-            'payload'          => $payload,
-            'catatan_pegawai'  => $request->catatan_pegawai,
-        ]);
-
-        return redirect()
-            ->route('pegawai.pengajuan.index')
-            ->with('success', 'Pengajuan perubahan berhasil dikirim dan menunggu persetujuan HCM/Admin.');
     }
 
+    $pegawai = Pegawai::where('nip', $nip)->first();
+
+    if (!$pegawai) {
+        return back()->withErrors([
+            'pegawai' => 'Data pegawai tidak ditemukan.'
+        ]);
+    }
+
+    $request->validate([
+        'nama'             => 'nullable|string|max:100',
+        'tempat_lahir'     => 'nullable|string|max:100',
+        'tgl_lahir'        => 'nullable|date',
+        'jenkel'           => 'nullable|string|max:20',
+        'agama'            => 'nullable|string|max:50',
+        'alamat'           => 'nullable|string',
+        'profesional'      => 'nullable|string|max:50',
+
+        'tmt_gol_jabatan'  => 'nullable|date',
+        'gol_jabatan'      => 'nullable|numeric',
+        'id_jabatan'       => 'nullable|integer|exists:tb_jabatan,id_jabatan',
+        'jabatan'          => 'nullable|string|max:100',
+        'departemen'       => 'nullable|string|max:100',
+
+        'hubungan_kerja'   => 'nullable|string|max:50',
+        'lokasi_kerja'     => 'nullable|string|max:50',
+        'status'           => 'nullable|string|max:50',
+        'tmt_gol_upah'     => 'nullable|date',
+        'gol_upah'         => 'nullable|numeric',
+        'tgl_masuk'        => 'nullable|date',
+        'foto'             => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+
+        'pendidikan'       => 'nullable|array',
+        'kursus'           => 'nullable|array',
+        'peng_bsp'         => 'nullable|array',
+        'peng_luar'        => 'nullable|array',
+        'keluarga'         => 'nullable|array',
+        'penilaian'        => 'nullable|array',
+        'catatan_pegawai'  => 'nullable|string',
+    ]);
+
+    $selectedJabatan = $this->resolveSelectedJabatan($request);
+
+    if ($selectedJabatan) {
+        $request->merge([
+            'id_jabatan'   => $selectedJabatan->id_jabatan,
+            'jabatan'      => $selectedJabatan->nama_jabatan,
+            'departemen'   => $selectedJabatan->departemen,
+            'gol_jabatan'  => is_numeric($selectedJabatan->gol_jabatan)
+                ? (int) $selectedJabatan->gol_jabatan
+                : $request->input('gol_jabatan'),
+            'lokasi_kerja' => $selectedJabatan->lokasi_kerja ?: $request->input('lokasi_kerja'),
+        ]);
+    }
+
+    $pegawaiPayload = [];
+
+    foreach ($this->pegawaiFields() as $field) {
+        if ($request->has($field)) {
+            $value = $request->input($field);
+            $pegawaiPayload[$field] = $value === '' ? null : $value;
+        }
+    }
+
+    if ($request->hasFile('foto')) {
+        $pegawaiPayload['foto'] = $request->file('foto')->store('pengajuan/foto', 'public');
+    }
+
+    $payload = [];
+    $pegawaiChanges = [];
+
+    foreach ($pegawaiPayload as $field => $newValue) {
+        $oldValue = $pegawai->{$field} ?? null;
+
+        if ((string) $oldValue !== (string) $newValue) {
+            $pegawaiChanges[$field] = $newValue;
+        }
+    }
+
+    if (!empty($pegawaiChanges)) {
+        $payload['pegawai'] = $pegawaiChanges;
+    }
+
+    foreach ($this->sectionKeys() as $key) {
+        /*
+        |--------------------------------------------------------------------------
+        | Simpan hanya data section yang benar-benar berubah pada request saat ini.
+        |--------------------------------------------------------------------------
+        | Form pengajuan biasanya mengirim seluruh data lama + data baru.
+        | Karena itu controller harus membandingkan baris baru dengan database,
+        | lalu payload hanya diisi oleh baris yang berubah/baru/dihapus.
+        */
+        if (!$request->has($key)) {
+            continue;
+        }
+
+        $newRows = $this->cleanRows($request->input($key, []));
+
+        $relationMap = [
+            'pendidikan' => 'pendidikan',
+            'kursus'     => 'kursus',
+            'peng_bsp'   => 'pengalamanBsp',
+            'peng_luar'  => 'pengalamanLuarBsp',
+            'keluarga'   => 'keluarga',
+            'penilaian'  => 'penilaian',
+        ];
+
+        $relation = $relationMap[$key];
+        $config = $this->childrenMap()[$key];
+        $primaryKey = $config['primary_key'];
+
+        $oldRows = $pegawai->{$relation}
+            ->map(fn($item) => collect($item->toArray())
+                ->except([
+                    'created_at',
+                    'updated_at',
+                    'nip',
+                ])
+                ->toArray()
+            )
+            ->values()
+            ->toArray();
+
+        $oldRowsById = collect($oldRows)
+            ->filter(fn($row) => !empty($row[$primaryKey] ?? null))
+            ->keyBy($primaryKey);
+
+        $submittedIds = [];
+        $changedRows = [];
+
+        foreach ($newRows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $id = $row[$primaryKey] ?? null;
+
+            if (!empty($id)) {
+                $submittedIds[] = (string) $id;
+
+                $oldRow = $oldRowsById->get($id);
+
+                if (!$oldRow) {
+                    $changedRows[] = $row;
+                    continue;
+                }
+
+                $normalizedOld = $this->normalizeRowForCompare($oldRow);
+                $normalizedNew = $this->normalizeRowForCompare($row);
+
+                if ($normalizedOld !== $normalizedNew) {
+                    $changedRows[] = $row;
+                }
+            } else {
+                $rowDataOnly = collect($row)
+                    ->except([$primaryKey, 'nip'])
+                    ->toArray();
+
+                if ($this->hasRealData($rowDataOnly)) {
+                    $changedRows[] = $row;
+                }
+            }
+        }
+
+        foreach ($oldRows as $oldRow) {
+            $oldId = $oldRow[$primaryKey] ?? null;
+
+            if (!empty($oldId) && !in_array((string) $oldId, $submittedIds, true)) {
+                $changedRows[] = [
+                    $primaryKey => $oldId,
+                    '_action' => 'delete',
+                ];
+            }
+        }
+
+        if (!empty($changedRows)) {
+            $payload[$key] = $changedRows;
+        }
+    }
+
+    if (empty($payload)) {
+        return back()->withErrors([
+            'pengajuan' => 'Tidak ada perubahan data yang diajukan.'
+        ]);
+    }
+
+    PengajuanPerubahan::create([
+        'nip'              => $nip,
+        'jenis'            => 'perubahan_data',
+        'nama_pegawai'     => $pegawaiPayload['nama'] ?? $pegawai->nama ?? null,
+        'id_user_pengaju'  => $user->getKey(),
+        'role_pengaju'     => $user->role,
+        'status'           => 'diajukan',
+        'payload'          => $payload,
+        'catatan_pegawai'  => $request->catatan_pegawai,
+    ]);
+
+    return redirect()
+        ->route('pegawai.pengajuan.index')
+        ->with('success_auto', 'Pengajuan perubahan berhasil dikirim dan menunggu persetujuan HCM/Admin.');
+}
     private function applyPayloadToPegawai(PengajuanPerubahan $pengajuan): void
     {
         $payload = $pengajuan->payload ?? [];
@@ -429,13 +479,50 @@ class PengajuanPerubahanController extends Controller
                 continue;
             }
 
-            $pegawai->{$relation}()->delete();
-
             foreach ($rows as $row) {
-                unset($row[$primaryKey]);
+                if (!is_array($row)) {
+                    continue;
+                }
 
-                if ($this->hasRealData($row)) {
-                    $pegawai->{$relation}()->create($row);
+                $action = $row['_action'] ?? null;
+                unset($row['_action']);
+
+                $id = $row[$primaryKey] ?? null;
+
+                if ($action === 'delete' && !empty($id)) {
+                    $pegawai->{$relation}()
+                        ->where($primaryKey, $id)
+                        ->delete();
+
+                    continue;
+                }
+
+                unset($row['nip']);
+
+                $rowDataOnly = collect($row)
+                    ->except([$primaryKey])
+                    ->toArray();
+
+                if (!empty($id)) {
+                    unset($row[$primaryKey]);
+
+                    $existing = $pegawai->{$relation}()
+                        ->where($primaryKey, $id)
+                        ->first();
+
+                    if ($existing) {
+                        $existing->update($row);
+                    } elseif ($this->hasRealData($rowDataOnly)) {
+                        $row['nip'] = $pegawai->nip;
+                        $pegawai->{$relation}()->create($row);
+                    }
+                } else {
+                    unset($row[$primaryKey]);
+
+                    if ($this->hasRealData($rowDataOnly)) {
+                        $row['nip'] = $pegawai->nip;
+                        $pegawai->{$relation}()->create($row);
+                    }
                 }
             }
         }
@@ -534,6 +621,31 @@ class PengajuanPerubahanController extends Controller
         }
 
         return $cleaned;
+    }
+
+    private function normalizeRowForCompare(array $row): array
+    {
+        $normalized = collect($row)
+            ->except([
+                'created_at',
+                'updated_at',
+                'nip',
+            ])
+            ->filter(function ($value) {
+                return $value !== null && $value !== '';
+            })
+            ->map(function ($value) {
+                if (is_numeric($value)) {
+                    return (string) $value;
+                }
+
+                return $value;
+            })
+            ->toArray();
+
+        ksort($normalized);
+
+        return $normalized;
     }
 
     private function hasRealData(array $row): bool

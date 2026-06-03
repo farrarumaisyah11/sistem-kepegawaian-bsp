@@ -4,11 +4,7 @@
 
 @section('content')
 @php
-    /*
-        Aman untuk Collection maupun Paginator.
-        Kalau controller pakai get(), DataTables akan bekerja penuh.
-        Kalau controller pakai paginate(), nomor tetap aman.
-    */
+    \Carbon\Carbon::setLocale('id');
     $isPaginator = method_exists($list, 'hasPages');
 
     $startNumber = ($isPaginator && method_exists($list, 'firstItem') && $list->firstItem())
@@ -17,11 +13,6 @@
 @endphp
 
 <div class="approval-page pt-2 pb-4">
-
-    @if(session('success'))
-        <div class="alert alert-success custom-alert d-none">{{ session('success') }}</div>
-    @endif
-
     @if(session('warning'))
         <div class="alert alert-warning custom-alert">
             {{ session('warning') }}
@@ -132,12 +123,18 @@
                                     {{ $startNumber + $index }}
                                 </td>
 
-                                <td class="text-center" data-order="{{ optional($row->created_at)->format('YmdHis') }}">
+                                @php
+                                    $createdAtWib = $row->created_at
+                                        ? \Illuminate\Support\Carbon::parse($row->created_at)->timezone('Asia/Jakarta')->locale('id')
+                                        : null;
+                                @endphp
+
+                                <td class="text-center" data-order="{{ $createdAtWib ? $createdAtWib->format('YmdHis') : '' }}">
                                     <div class="date-main">
-                                        {{ optional($row->created_at)->format('d/m/Y') ?? '-' }}
+                                        {{ $createdAtWib ? $createdAtWib->translatedFormat('d F Y') : '-' }}
                                     </div>
                                     <div class="date-sub">
-                                        {{ optional($row->created_at)->format('H:i') ?? '--:--' }} WIB
+                                        {{ $createdAtWib ? $createdAtWib->format('H:i') . ' WIB' : '--:-- WIB' }}
                                     </div>
                                 </td>
 
@@ -226,7 +223,7 @@
     }
 
     .page-title {
-        color: #273957;
+        color: #3f4a32;
         font-size: 32px;
         font-weight: 700;
         letter-spacing: -.3px;
@@ -270,7 +267,7 @@
     }
 
     .table-title {
-        color: #273957;
+        color: #3f4a32;
         font-size: 18px;
         font-weight: 700;
     }
@@ -332,33 +329,41 @@
         padding: 6px 12px;
         border-radius: 999px;
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 800;
         white-space: nowrap;
+        border: 1px solid transparent;
+        letter-spacing: .02em;
     }
 
+    /* Status dibuat lebih berbeda agar mudah dibaca */
     .badge-pending {
-        background: #eef2eb;
-        color: #536044;
+        background: #e8eef5;
+        color: #273957;
+        border-color: #b9c8dc;
     }
 
     .badge-process {
-        background: #fff2c6;
-        color: #7b5a00;
+        background: #fff3c4;
+        color: #7a5200;
+        border-color: #f3c94b;
     }
 
     .badge-success-custom {
-        background: #eaf5e7;
-        color: #2f6b32;
+        background: #e7f6ec;
+        color: #1f7a3a;
+        border-color: #9bd6aa;
     }
 
     .badge-reject {
-        background: #ffe5e5;
-        color: #b91c1c;
+        background: #fde8e8;
+        color: #b42318;
+        border-color: #f3b3b0;
     }
 
     .badge-default {
         background: #f3f4f6;
         color: #374151;
+        border-color: #d1d5db;
     }
 
     .change-wrap {
@@ -402,12 +407,13 @@
         color: #fff;
     }
 
+    /* Icon aksi lihat detail dikembalikan ke navy seperti sebelumnya */
     .icon-view {
-        background: #332da1 !important;
+        background: #273957 !important;
     }
 
     .icon-view:hover {
-        background: #282383 !important;
+        background: #1f2f49 !important;
         color: #fff !important;
         transform: translateY(-1px);
     }
@@ -531,6 +537,7 @@
             margin-top: 6px;
         }
     }
+    
 </style>
 @endpush
 
@@ -540,21 +547,6 @@
 <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-@if(session('success'))
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil',
-            text: @json(session('success')),
-            confirmButtonText: 'OK',
-            confirmButtonColor: '#6b775c'
-        });
-    });
-</script>
-@endif
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -563,8 +555,6 @@
             scrollX: true,
             autoWidth: false,
 
-            // Kalau $list masih dari paginate(), pagination Laravel tetap muncul.
-            // Kalau controller pakai get(), DataTables akan pakai pagination/search bawaan.
             paging: @json(!$isPaginator),
             searching: @json(!$isPaginator),
             info: @json(!$isPaginator),

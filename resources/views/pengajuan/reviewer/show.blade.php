@@ -120,7 +120,7 @@
 
         if (in_array($key, $dateFields, true)) {
             try {
-                return e(\Carbon\Carbon::parse($value)->format('d/m/Y'));
+                return e(\Carbon\Carbon::parse($value)->locale('id')->translatedFormat('d F Y'));
             } catch (\Throwable $exception) {
                 return e($value);
             }
@@ -151,11 +151,11 @@
         ->sum(fn($key) => count($payload[$key] ?? []));
 
     $tanggalPengajuan = $pengajuan->created_at
-        ? $pengajuan->created_at->locale('id')->translatedFormat('d F Y')
+        ? $pengajuan->created_at->timezone('Asia/Jakarta')->locale('id')->translatedFormat('d F Y')
         : '-';
 
     $jamPengajuan = $pengajuan->created_at
-        ? $pengajuan->created_at->format('H:i') . ' WIB'
+        ? $pengajuan->created_at->timezone('Asia/Jakarta')->format('H:i') . ' WIB'
         : '-';
 @endphp
 
@@ -427,14 +427,14 @@
 @push('styles')
 <style>
     :root {
-        --corp-navy: #23324d;
-        --corp-navy-2: #30415f;
-        --corp-olive: #66764f;
-        --corp-olive-dark: #4f5f39;
-        --corp-teal: #0f766e;
-        --corp-blue: #2563eb;
-        --corp-amber: #d97706;
-        --corp-violet: #6d5bd0;
+        --corp-navy: #3f4a32;
+        --corp-navy-2: #536044;
+        --corp-olive: #6b775c;
+        --corp-olive-dark: #3f4a32;
+        --corp-teal: #5f6b4b;
+        --corp-blue: #6b775c;
+        --corp-amber: #c5a059;
+        --corp-violet: #87956f;
         --corp-green: #15803d;
         --corp-red: #dc2626;
         --corp-border: #e5e9ef;
@@ -444,8 +444,7 @@
     }
 
     body {
-        background:
-            background-color: #f4f6f2;
+        background-color: #f4f6f2;
     }
 
     .review-page {
@@ -497,33 +496,33 @@
     }
 
     .status-new {
-        background: #f4f6f2;
-        color: var(--corp-olive-dark);
-        border: 1px solid #dce3d5;
+        background: #e8eef5;
+        color: #273957;
+        border: 1px solid #b9c8dc;
     }
 
     .status-process {
-        background: #f8f4e6;
-        color: #74623c;
-        border: 1px solid #e8dcc0;
+        background: #fff3c4;
+        color: #7a5200;
+        border: 1px solid #f3c94b;
     }
 
     .status-approved {
-        background: #eef5eb;
-        color: #4f653a;
-        border: 1px solid #d7e4cf;
+        background: #e7f6ec;
+        color: #1f7a3a;
+        border: 1px solid #9bd6aa;
     }
 
     .status-rejected {
-        background: #f8eeee;
-        color: #8f3f3f;
-        border: 1px solid #ead4d4;
+        background: #fde8e8;
+        color: #b42318;
+        border: 1px solid #f3b3b0;
     }
 
     .status-default {
         background: #f3f4f6;
         color: #374151;
-        border: 1px solid #e5e7eb;
+        border: 1px solid #d1d5db;
     }
 
     .hero-card {
@@ -1179,6 +1178,7 @@
             width: 38%;
         }
     }
+    
 </style>
 @endpush
 
@@ -1204,8 +1204,8 @@
                     showCancelButton: true,
                     confirmButtonText: 'Ya, Approve',
                     cancelButtonText: 'Batal',
-                    confirmButtonColor: '#15803d',
-                    cancelButtonColor: '#6b7280',
+                    confirmButtonColor: '#6b775c',
+                    cancelButtonColor: '#c5a059',
                     reverseButtons: true,
                     focusCancel: true
                 }).then((result) => {
@@ -1249,7 +1249,7 @@
                         title: 'Alasan Penolakan Wajib Diisi',
                         text: 'Silakan isi alasan penolakan terlebih dahulu.',
                         confirmButtonText: 'Mengerti',
-                        confirmButtonColor: '#dc2626'
+                        confirmButtonColor: '#d66b6b'
                     });
 
                     return;
@@ -1262,8 +1262,8 @@
                     showCancelButton: true,
                     confirmButtonText: 'Ya, Tolak',
                     cancelButtonText: 'Batal',
-                    confirmButtonColor: '#dc2626',
-                    cancelButtonColor: '#6b7280',
+                    confirmButtonColor: '#d66b6b',
+                    cancelButtonColor: '#c5a059',
                     reverseButtons: true,
                     focusCancel: true
                 }).then((result) => {

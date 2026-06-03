@@ -4,6 +4,7 @@
 
 @section('content')
 @php
+    \Carbon\Carbon::setLocale('id');
     $pengajuanAktif = $pengajuanAktif ?? collect();
     $riwayatPengajuan = $riwayatPengajuan ?? collect();
 
@@ -162,9 +163,15 @@
                                             </span>
                                         </td>
 
-                                        <td class="text-center" data-order="{{ optional($item->created_at)->format('YmdHis') }}">
-                                            <div class="date-main">{{ optional($item->created_at)->format('d/m/Y') }}</div>
-                                            <div class="date-sub">{{ optional($item->created_at)->format('H:i') }}</div>
+                                        @php
+                                            $createdAtWib = $item->created_at
+                                                ? \Illuminate\Support\Carbon::parse($item->created_at)->timezone('Asia/Jakarta')->locale('id')
+                                                : null;
+                                        @endphp
+
+                                        <td class="text-center" data-order="{{ $createdAtWib ? $createdAtWib->format('YmdHis') : '' }}">
+                                            <div class="date-main">{{ $createdAtWib ? $createdAtWib->translatedFormat('d F Y') : '-' }}</div>
+                                            <div class="date-sub">{{ $createdAtWib ? $createdAtWib->format('H:i') . ' WIB' : '--:-- WIB' }}</div>
                                         </td>
 
                                         <td class="text-center">
@@ -260,9 +267,15 @@
                                             </span>
                                         </td>
 
-                                        <td class="text-center" data-order="{{ optional($item->created_at)->format('YmdHis') }}">
-                                            <div class="date-main">{{ optional($item->created_at)->format('d/m/Y') }}</div>
-                                            <div class="date-sub">{{ optional($item->created_at)->format('H:i') }}</div>
+                                        @php
+                                            $createdAtWib = $item->created_at
+                                                ? \Illuminate\Support\Carbon::parse($item->created_at)->timezone('Asia/Jakarta')->locale('id')
+                                                : null;
+                                        @endphp
+
+                                        <td class="text-center" data-order="{{ $createdAtWib ? $createdAtWib->format('YmdHis') : '' }}">
+                                            <div class="date-main">{{ $createdAtWib ? $createdAtWib->translatedFormat('d F Y') : '-' }}</div>
+                                            <div class="date-sub">{{ $createdAtWib ? $createdAtWib->format('H:i') . ' WIB' : '--:-- WIB' }}</div>
                                         </td>
 
                                         <td class="text-center">
@@ -342,7 +355,7 @@
     }
 
     .page-title {
-        color: #273957;
+        color: #3f4a32;
         font-size: 32px;
         font-weight: 700;
         letter-spacing: -.3px;
@@ -394,7 +407,7 @@
     .summary-value {
         font-size: 28px;
         line-height: 1;
-        color: #273957;
+        color: #3f4a32;
         font-weight: 800;
     }
 
@@ -409,7 +422,7 @@
     }
 
     .table-title {
-        color: #273957;
+        color: #3f4a32;
         font-size: 18px;
         font-weight: 700;
     }
@@ -530,33 +543,41 @@
         padding: 6px 12px;
         border-radius: 999px;
         font-size: 12px;
-        font-weight: 700;
+        font-weight: 800;
         white-space: nowrap;
+        border: 1px solid transparent;
+        letter-spacing: .02em;
     }
 
+    /* Status dibuat lebih berbeda agar mudah dibaca */
     .badge-pending {
-        background: #eef2eb;
-        color: #536044;
+        background: #e8eef5;
+        color: #273957;
+        border-color: #b9c8dc;
     }
 
     .badge-process {
-        background: #fff2c6;
-        color: #7b5a00;
+        background: #fff3c4;
+        color: #7a5200;
+        border-color: #f3c94b;
     }
 
     .badge-success-custom {
-        background: #eaf5e7;
-        color: #2f6b32;
+        background: #e7f6ec;
+        color: #1f7a3a;
+        border-color: #9bd6aa;
     }
 
     .badge-reject {
-        background: #ffe5e5;
-        color: #b91c1c;
+        background: #fde8e8;
+        color: #b42318;
+        border-color: #f3b3b0;
     }
 
     .badge-default {
         background: #f3f4f6;
         color: #374151;
+        border-color: #d1d5db;
     }
 
     .date-main {
@@ -601,12 +622,13 @@
         color: #fff;
     }
 
+    /* Icon aksi lihat detail dikembalikan ke navy seperti sebelumnya */
     .icon-view {
-        background: #332da1 !important;
+        background: #273957 !important;
     }
 
     .icon-view:hover {
-        background: #282383 !important;
+        background: #1f2f49 !important;
         color: #fff !important;
         transform: translateY(-1px);
     }
@@ -767,6 +789,7 @@
             margin-top: 6px;
         }
     }
+    
 </style>
 @endpush
 
@@ -886,7 +909,7 @@
                     confirmButtonText: 'Ya, hapus',
                     cancelButtonText: 'Batal',
                     confirmButtonColor: '#dc2626',
-                    cancelButtonColor: '#6b775c',
+                    cancelButtonColor: '#c5a059',
                     reverseButtons: true,
                     focusCancel: true
                 }).then((result) => {

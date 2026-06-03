@@ -115,7 +115,7 @@
 }
 
 .page-header-pengajuan h2{
-    color:#273957;
+    color:#3f4a32;
     font-size:30px;
     font-weight:700;
     margin-bottom:8px;
@@ -125,6 +125,57 @@
     color:#6b7280;
     font-size:14px;
     margin-bottom:0;
+}
+
+
+.btn-primary,
+.btn-success{
+    background:#6b775c !important;
+    border-color:#6b775c !important;
+    color:#fff !important;
+}
+
+.btn-primary:hover,
+.btn-success:hover{
+    background:#59664b !important;
+    border-color:#59664b !important;
+    color:#fff !important;
+}
+
+.btn-warning{
+    background:#f3c94b !important;
+    border-color:#f3c94b !important;
+    color:#3f4a32 !important;
+}
+
+.btn-warning:hover{
+    background:#e5bb39 !important;
+    border-color:#e5bb39 !important;
+    color:#3f4a32 !important;
+}
+
+.btn-secondary{
+    background:#87956f !important;
+    border-color:#87956f !important;
+    color:#fff !important;
+}
+
+.btn-secondary:hover{
+    background:#6b775c !important;
+    border-color:#6b775c !important;
+    color:#fff !important;
+}
+
+.btn-danger{
+    background:#d66b6b !important;
+    border-color:#d66b6b !important;
+    color:#fff !important;
+}
+
+.btn-danger:hover{
+    background:#c45656 !important;
+    border-color:#c45656 !important;
+    color:#fff !important;
 }
 
 @media (max-width: 768px){
@@ -765,6 +816,7 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     showSection(1);
@@ -1042,11 +1094,35 @@ function submitFormPegawai() {
     const form = document.getElementById('form-karyawan');
     if (!form) return;
 
-    if (form.requestSubmit) {
-        form.requestSubmit();
-    } else {
-        form.submit();
-    }
+    Swal.fire({
+        icon: 'question',
+        title: 'Kirim Pengajuan?',
+        text: 'Pastikan data yang diajukan sudah benar. Pengajuan akan dikirim ke HCM/Admin untuk diproses.',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, Kirim',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#6b775c',
+        cancelButtonColor: '#c5a059',
+        reverseButtons: true,
+        allowOutsideClick: false,
+        allowEscapeKey: true
+    }).then((result) => {
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        const btn = document.getElementById('btn-submit-pegawai');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Mengirim...';
+        }
+
+        if (form.requestSubmit) {
+            form.requestSubmit();
+        } else {
+            form.submit();
+        }
+    });
 }
 </script>
 @endpush
