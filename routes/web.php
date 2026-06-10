@@ -48,13 +48,73 @@ Route::get('/', function () {
 |--------------------------------------------------------------------------
 | GLOBAL ROUTE - FOTO, JOB DESCRIPTION PEGAWAI, DETAIL PEGAWAI
 |--------------------------------------------------------------------------
-| PENTING:
-| /pegawai/job-description harus berada DI ATAS /pegawai/{pegawai:nip}
-| supaya tidak dianggap sebagai parameter NIP.
-|--------------------------------------------------------------------------
 */
 
 Route::middleware(['auth'])->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Route khusus untuk menampilkan foto pegawai dari folder storage/public
+    |--------------------------------------------------------------------------
+    | Dipakai oleh header:
+    | route('foto.pegawai', ['path' => $pathFoto])
+    |
+    | Bisa membaca file dari:
+    | - storage/app/public/karyawan/...
+    | - storage/app/public/pengajuan/foto/...
+    | - storage/app/karyawan/...
+    | - storage/app/pengajuan/foto/...
+    | - public/karyawan/...
+    | - public/pengajuan/foto/...
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/foto-pegawai/{path}', function ($path) {
+        $path = rawurldecode($path);
+        $path = str_replace('\\', '/', $path);
+        $path = ltrim($path, '/');
+
+        // Bersihkan awalan kalau ada
+        $path = preg_replace('#^storage/#', '', $path);
+        $path = preg_replace('#^public/#', '', $path);
+
+        // Keamanan: cegah akses folder/file sembarangan
+        if (str_contains($path, '..')) {
+            abort(403);
+        }
+
+        $allowedFolders = [
+            'karyawan/',
+            'pengajuan/foto/',
+        ];
+
+        $isAllowed = false;
+
+        foreach ($allowedFolders as $folder) {
+            if (str_starts_with($path, $folder)) {
+                $isAllowed = true;
+                break;
+            }
+        }
+
+        if (!$isAllowed) {
+            abort(403);
+        }
+
+        $fileCandidates = [
+            storage_path('app/public/' . $path),
+            storage_path('app/' . $path),
+            public_path($path),
+        ];
+
+        foreach ($fileCandidates as $filePath) {
+            if (file_exists($filePath) && is_file($filePath)) {
+                return response()->file($filePath);
+            }
+        }
+
+        abort(404);
+    })->where('path', '.*')->name('foto.pegawai');
+
     Route::get('/pegawai/foto/{pegawai:nip}', [PegawaiController::class, 'foto'])
         ->whereNumber('pegawai')
         ->name('pegawai.foto');
@@ -62,6 +122,16 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/pegawai/job-description', [PegawaiController::class, 'jobDescription'])
         ->middleware('role:pegawai')
         ->name('pegawai.job-description');
+
+    Route::get('/pegawai/job-description/{assignment}/detail', [PegawaiController::class, 'jobDescriptionDetail'])
+        ->middleware('role:pegawai')
+        ->whereNumber('assignment')
+        ->name('pegawai.job-description.detail');
+
+    Route::post('/pegawai/job-description/{assignment}/acknowledge', [PegawaiController::class, 'acknowledgeJobDescription'])
+        ->middleware('role:pegawai')
+        ->whereNumber('assignment')
+        ->name('pegawai.job-description.acknowledge');
 
     Route::get('/pegawai/{pegawai:nip}', [PegawaiController::class, 'show'])
         ->whereNumber('pegawai')
@@ -72,30 +142,48 @@ Route::middleware(['auth'])->group(function () {
 |--------------------------------------------------------------------------
 | APPROVAL JOB DESCRIPTION VIA QR
 |--------------------------------------------------------------------------
-| Route ini dibuat global, bukan /admin atau /hcm, supaya QR code punya URL tetap.
-| Tetap aman karena hanya bisa diakses role admin/hcm.
-|--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'role:admin,hcm'])->group(function () {
-    Route::get('/jabatan/{jabatan}/approval', [JabatanController::class, 'approvalPage'])
-        ->whereNumber('jabatan')
-        ->name('jabatan.approval.page');
+Route::middleware(['auth', 'role:admin,hcm'])
+    ->prefix('approval-jabatan')
+    ->name('jabatan.approval.')
+    ->group(function () {
 
-    Route::get('/jabatan/{jabatan}/approval-qr', [JabatanController::class, 'approvalQr'])
-        ->whereNumber('jabatan')
-        ->name('jabatan.approval.qr');
+        Route::get('/{jabatan}', [JabatanController::class, 'approvalPage'])
+            ->whereNumber('jabatan')
+            ->name('page');
 
-    Route::get('/jabatan/{jabatan}/approval/{token}', [JabatanController::class, 'approvalScan'])
-        ->whereNumber('jabatan')
-        ->where('token', '[A-Za-z0-9\-]+')
-        ->name('jabatan.approval.scan');
+        Route::get('/{jabatan}/qr', [JabatanController::class, 'approvalQr'])
+            ->whereNumber('jabatan')
+            ->name('qr');
+    });
 
-    Route::post('/jabatan/{jabatan}/approval/{token}', [JabatanController::class, 'approvalApprove'])
-        ->whereNumber('jabatan')
-        ->where('token', '[A-Za-z0-9\-]+')
-        ->name('jabatan.approval.approve');
-});
+Route::middleware(['auth', 'role:hcm,pegawai'])
+    ->prefix('approval-jabatan')
+    ->name('jabatan.approval.')
+    ->group(function () {
+
+        Route::get('/{jabatan}/{token}', [JabatanController::class, 'approvalScan'])
+            ->whereNumber('jabatan')
+            ->where('token', '[A-Za-z0-9\-]+')
+            ->name('scan');
+
+        Route::get('/{jabatan}/{token}/detail', [JabatanController::class, 'approvalDetail'])
+            ->whereNumber('jabatan')
+            ->where('token', '[A-Za-z0-9\-]+')
+            ->name('detail');
+
+        Route::post('/{jabatan}/{token}', [JabatanController::class, 'approvalApprove'])
+            ->whereNumber('jabatan')
+            ->where('token', '[A-Za-z0-9\-]+')
+            ->name('approve');
+
+        Route::post('/{jabatan}/{token}/confirm-final', [JabatanController::class, 'approvalConfirmFinal'])
+            ->whereNumber('jabatan')
+            ->where('token', '[A-Za-z0-9\-]+')
+            ->middleware('role:hcm')
+            ->name('confirm-final');
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -108,22 +196,12 @@ Route::middleware(['auth', 'role:admin'])
     ->name('admin.')
     ->group(function () {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Dashboard Admin
-        |--------------------------------------------------------------------------
-        */
         Route::get('/dashboard', [AdminController::class, 'index'])
             ->name('dashboard');
 
         Route::get('/dashboard/stats', [AdminController::class, 'stats'])
             ->name('dashboard.stats');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Pengajuan Perubahan - Admin
-        |--------------------------------------------------------------------------
-        */
         Route::get('/pengajuan', [PengajuanPerubahanController::class, 'indexReviewer'])
             ->name('pengajuan.index');
 
@@ -142,11 +220,6 @@ Route::middleware(['auth', 'role:admin'])
         Route::delete('/pengajuan/{pengajuan}', [PengajuanPerubahanController::class, 'destroyReviewer'])
             ->name('pengajuan.destroy');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Pegawai - Admin
-        |--------------------------------------------------------------------------
-        */
         Route::resource('pegawai', PegawaiController::class)
             ->except(['show']);
 
@@ -169,34 +242,32 @@ Route::middleware(['auth', 'role:admin'])
         Route::post('/pegawai/import-excel/save', [PegawaiController::class, 'saveImportPreview'])
             ->name('pegawai.import.save');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Detail Pegawai Admin
-        |--------------------------------------------------------------------------
-        | Taruh paling bawah supaya /pegawai/create tidak ketangkap sebagai NIP.
-        */
         Route::get('/pegawai/{pegawai:nip}', [PegawaiController::class, 'show'])
             ->whereNumber('pegawai')
             ->name('pegawai.show');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Jabatan - Admin
-        |--------------------------------------------------------------------------
-        */
         Route::resource('jabatan', JabatanController::class);
 
         Route::get('/jabatan/{jabatan}/print', [JabatanController::class, 'print'])
             ->whereNumber('jabatan')
             ->name('jabatan.print');
 
-        Route::get('/jabatan/{jabatan}/export/pdf', [JabatanController::class, 'exportPdf'])
-            ->whereNumber('jabatan')
-            ->name('jabatan.export.pdf');
-
         Route::get('/jabatan/{jabatan}/export/excel', [JabatanController::class, 'exportExcel'])
             ->whereNumber('jabatan')
             ->name('jabatan.export.excel');
+
+        Route::get('/jabatan/{jabatan}/versions', [JabatanController::class, 'versions'])
+            ->whereNumber('jabatan')
+            ->name('jabatan.versions');
+
+        Route::get('/jabatan/{jabatan}/versions/{version}', [JabatanController::class, 'showVersion'])
+            ->whereNumber('jabatan')
+            ->whereNumber('version')
+            ->name('jabatan.versions.show');
+
+        Route::post('/jabatan/{jabatan}/apply-approved-version', [JabatanController::class, 'applyApprovedVersionToPegawai'])
+            ->whereNumber('jabatan')
+            ->name('jabatan.apply-approved-version');
     });
 
 /*
@@ -210,22 +281,12 @@ Route::middleware(['auth', 'role:hcm'])
     ->name('hcm.')
     ->group(function () {
 
-        /*
-        |--------------------------------------------------------------------------
-        | Dashboard HCM
-        |--------------------------------------------------------------------------
-        */
         Route::get('/dashboard', [HcmController::class, 'index'])
             ->name('dashboard');
 
         Route::get('/dashboard/stats', [HcmController::class, 'stats'])
             ->name('dashboard.stats');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Pengajuan Perubahan - HCM
-        |--------------------------------------------------------------------------
-        */
         Route::get('/pengajuan', [PengajuanPerubahanController::class, 'indexReviewer'])
             ->name('pengajuan.index');
 
@@ -244,11 +305,6 @@ Route::middleware(['auth', 'role:hcm'])
         Route::delete('/pengajuan/{pengajuan}', [PengajuanPerubahanController::class, 'destroyReviewer'])
             ->name('pengajuan.destroy');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Pegawai - HCM
-        |--------------------------------------------------------------------------
-        */
         Route::resource('pegawai', PegawaiController::class)
             ->except(['show']);
 
@@ -271,34 +327,32 @@ Route::middleware(['auth', 'role:hcm'])
         Route::post('/pegawai/import-excel/save', [PegawaiController::class, 'saveImportPreview'])
             ->name('pegawai.import.save');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Detail Pegawai HCM
-        |--------------------------------------------------------------------------
-        | Taruh paling bawah supaya /pegawai/create tidak ketangkap sebagai NIP.
-        */
         Route::get('/pegawai/{pegawai:nip}', [PegawaiController::class, 'show'])
             ->whereNumber('pegawai')
             ->name('pegawai.show');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Jabatan - HCM
-        |--------------------------------------------------------------------------
-        */
         Route::resource('jabatan', JabatanController::class);
 
         Route::get('/jabatan/{jabatan}/print', [JabatanController::class, 'print'])
             ->whereNumber('jabatan')
             ->name('jabatan.print');
 
-        Route::get('/jabatan/{jabatan}/export/pdf', [JabatanController::class, 'exportPdf'])
-            ->whereNumber('jabatan')
-            ->name('jabatan.export.pdf');
-
         Route::get('/jabatan/{jabatan}/export/excel', [JabatanController::class, 'exportExcel'])
             ->whereNumber('jabatan')
             ->name('jabatan.export.excel');
+
+        Route::get('/jabatan/{jabatan}/versions', [JabatanController::class, 'versions'])
+            ->whereNumber('jabatan')
+            ->name('jabatan.versions');
+
+        Route::get('/jabatan/{jabatan}/versions/{version}', [JabatanController::class, 'showVersion'])
+            ->whereNumber('jabatan')
+            ->whereNumber('version')
+            ->name('jabatan.versions.show');
+
+        Route::post('/jabatan/{jabatan}/apply-approved-version', [JabatanController::class, 'applyApprovedVersionToPegawai'])
+            ->whereNumber('jabatan')
+            ->name('jabatan.apply-approved-version');
     });
 
 /*
@@ -326,20 +380,10 @@ Route::middleware(['auth', 'role:pegawai'])->group(function () {
         return redirect()->route('pegawai.show', $nip);
     })->name('pegawai.saya');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Edit Data Pegawai Sendiri
-    |--------------------------------------------------------------------------
-    */
     Route::get('/pegawai/{pegawai:nip}/edit', [PegawaiController::class, 'edit'])
         ->whereNumber('pegawai')
         ->name('pegawai.edit');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Pengajuan Perubahan - Pegawai
-    |--------------------------------------------------------------------------
-    */
     Route::get('/pengajuan-perubahan', [PengajuanPerubahanController::class, 'indexPegawai'])
         ->name('pegawai.pengajuan.index');
 
@@ -352,11 +396,6 @@ Route::middleware(['auth', 'role:pegawai'])->group(function () {
     Route::get('/pengajuan-perubahan/{pengajuan}', [PengajuanPerubahanController::class, 'showPegawai'])
         ->name('pegawai.pengajuan.show');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Change Password - Pegawai
-    |--------------------------------------------------------------------------
-    */
     Route::get('/change-password', [PegawaiController::class, 'showChangePasswordForm'])
         ->name('change-password');
 

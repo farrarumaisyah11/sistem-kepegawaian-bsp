@@ -407,13 +407,13 @@
         color: #fff;
     }
 
-    /* Icon aksi lihat detail dikembalikan ke navy seperti sebelumnya */
+    /* Icon aksi lihat detail disamakan dengan view jabatan */
     .icon-view {
-        background: #273957 !important;
+        background: #332da1 !important;
     }
 
     .icon-view:hover {
-        background: #1f2f49 !important;
+        background: #282383 !important;
         color: #fff !important;
         transform: translateY(-1px);
     }
@@ -537,7 +537,6 @@
             margin-top: 6px;
         }
     }
-    
 </style>
 @endpush
 

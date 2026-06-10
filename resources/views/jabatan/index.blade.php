@@ -5,6 +5,18 @@
 @section('content')
 @php
     $prefix = auth()->user()->role; // admin / hcm
+
+    $formatTanggalIndonesia = function ($date) {
+        if (!$date) {
+            return '-';
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($date)->locale('id')->translatedFormat('d F Y H:i');
+        } catch (\Throwable $e) {
+            return '-';
+        }
+    };
 @endphp
 
 <div class="approval-page pt-2 pb-4">
@@ -14,24 +26,14 @@
     @endif
 
     @if ($errors->any())
-    <div class="alert alert-danger rounded-4 shadow-sm">
-        <ul class="mb-0 ps-3">
-            @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif 
-
-    @if($errors->any())
-        <div class="alert alert-danger custom-alert">
-            <ul class="mb-0">
-                @foreach($errors->all() as $error)
+        <div class="alert alert-danger rounded-4 shadow-sm">
+            <ul class="mb-0 ps-3">
+                @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
         </div>
-    @endif
+    @endif 
 
     <div class="page-header-card mb-4">
         <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
@@ -60,17 +62,29 @@
                             <th>Departemen</th>
                             <th>Lokasi Kerja</th>
                             <th>Home Base</th>
+                            <th>Terakhir Update</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
 
                     <tbody>
                         @foreach($jabatans as $i => $jabatan)
+                            @php
+                                $activeVersion = $jabatan->activeVersion ?? null;
+
+                                $lastUpdateSource = $activeVersion->approved_at
+                                    ?? $jabatan->jobdesk_updated_at
+                                    ?? $jabatan->approved_at
+                                    ?? null;
+                            @endphp
+
                             <tr>
                                 <td class="text-center">{{ $i + 1 }}</td>
 
                                 <td class="name-cell">
-                                    {{ $jabatan->nama_jabatan ?? '-' }}
+                                    <a href="{{ route($prefix.'.jabatan.show', $jabatan->id_jabatan) }}" class="jabatan-link">
+                                        {{ $jabatan->nama_jabatan ?? '-' }}
+                                    </a>
                                 </td>
 
                                 <td class="text-center">
@@ -88,8 +102,11 @@
                                 </td>
 
                                 <td class="text-center">
+                                    {{ $formatTanggalIndonesia($lastUpdateSource) }}
+                                </td>
+
+                                <td class="text-center">
                                     <div class="action-group">
-                                        {{-- EDIT --}}
                                         <a href="{{ route($prefix.'.jabatan.edit', $jabatan->id_jabatan) }}"
                                            class="icon-btn icon-edit"
                                            title="Edit Jabatan">
@@ -99,7 +116,6 @@
                                             </svg>
                                         </a>
 
-                                        {{-- DETAIL --}}
                                         <a href="{{ route($prefix.'.jabatan.show', $jabatan->id_jabatan) }}"
                                            class="icon-btn icon-view"
                                            title="Lihat Detail">
@@ -109,7 +125,6 @@
                                             </svg>
                                         </a>
 
-                                        {{-- DELETE --}}
                                         <form action="{{ route($prefix.'.jabatan.destroy', $jabatan->id_jabatan) }}"
                                               method="POST"
                                               class="delete-form d-inline"
@@ -210,17 +225,6 @@
         padding: 20px 22px;
     }
 
-    .table-title {
-        color: #273957;
-        font-size: 18px;
-        font-weight: 700;
-    }
-
-    .table-subtitle {
-        color: #6b7280;
-        font-size: 13px;
-    }
-
     .approval-table {
         border-color: #e8ece5 !important;
         margin-bottom: 0 !important;
@@ -253,6 +257,17 @@
     .name-cell {
         font-weight: 600;
         line-height: 1.35;
+    }
+
+    .jabatan-link {
+        color: #273957;
+        text-decoration: none;
+        font-weight: 700;
+    }
+
+    .jabatan-link:hover {
+        color: #6b775c;
+        text-decoration: underline;
     }
 
     .soft-badge {
@@ -438,6 +453,22 @@
 </script>
 @endif
 
+@if(session('success_auto'))
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        Swal.fire({
+            icon: 'success',
+            title: 'Berhasil',
+            text: @json(session('success_auto')),
+            timer: 3500,
+            timerProgressBar: true,
+            showConfirmButton: false,
+            confirmButtonColor: '#6b775c'
+        });
+    });
+</script>
+@endif
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         $('#datatable').DataTable({
@@ -462,8 +493,8 @@
                 }
             },
             columnDefs: [
-                { orderable: false, targets: [5] },
-                { searchable: false, targets: [0, 5] }
+                { orderable: false, targets: [6] },
+                { searchable: false, targets: [0, 6] }
             ]
         });
 

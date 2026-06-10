@@ -1,403 +1,268 @@
-@extends('layouts.app')
+@extends('layouts.approval')
 @section('title', 'Approval Job Description')
 
 @section('content')
 @php
-    $prefix = auth()->user()->role;
-    $approvalStatus = $jabatan->approval_status ?? 'pending';
+    $prefix = auth()->user()->role ?? 'hcm';
 
-    $approvalDate = '-';
-    if (!empty($jabatan->approved_at)) {
+    $activeVersion = $jabatan->activeVersion;
+    $pendingVersion = $jabatan->pendingVersion;
+
+    $approvalStatus = $jabatan->approval_status ?? 'pending';
+    $approvalFlowStatus = $jabatan->approval_flow_status ?? 'pending';
+
+    $formatTanggalIndonesia = function ($date) {
+        if (!$date) return '-';
+
         try {
-            $approvalDate = \Illuminate\Support\Carbon::parse($jabatan->approved_at)->format('d-m-Y H:i');
+            return \Illuminate\Support\Carbon::parse($date)
+                ->locale('id')
+                ->translatedFormat('d F Y H:i');
         } catch (\Throwable $e) {
-            $approvalDate = $jabatan->approved_at;
+            return $date;
         }
-    }
+    };
+
+    $approvalDate = $formatTanggalIndonesia($jabatan->approved_at ?? null);
+    $proposedApprovalDate = $formatTanggalIndonesia($jabatan->proposed_approved_at ?? null);
+    $hcmConfirmedDate = $formatTanggalIndonesia($jabatan->hcm_confirmed_at ?? null);
+    $lastUpdatedDate = $formatTanggalIndonesia($jabatan->jobdesk_updated_at ?? null);
 
     $approvalToken = $jabatan->approval_token ?? '';
-
-    /*
-        Link ini yang akan masuk ke QR.
-        Kalau mau discan dari HP, nanti APP_URL di .env harus pakai IP laptop,
-        bukan 127.0.0.1.
-    */
-    $approvalUrl = $approvalToken
-        ? url('/jabatan/'.$jabatan->id_jabatan.'/approval/'.$approvalToken)
-        : '';
+    $qrUrl = $approvalToken ? route('jabatan.approval.qr', $jabatan->id_jabatan).'?v='.urlencode($approvalToken) : '';
 @endphp
 
-<div class="approval-page">
-    <div class="container py-4">
-
-        <div class="approval-header mb-4">
-            <div>
-                <div class="approval-eyebrow">JOB DESCRIPTION APPROVAL</div>
-                <h3 class="approval-title mb-1">Approval Job Description</h3>
-                <p class="text-muted mb-0">
-                    Halaman ini digunakan untuk melihat status approval dan QR approval dokumen jabatan.
-                </p>
-            </div>
-
-            <a href="{{ route($prefix.'.jabatan.show', $jabatan->id_jabatan) }}"
-               class="btn btn-outline-secondary rounded-4">
-                <i class="bi bi-arrow-left"></i> Kembali ke Detail Jabatan
-            </a>
+<div class="approval-panel">
+    <div class="approval-panel-head">
+        <div>
+            <div class="approval-eyebrow">Job Description Approval</div>
+            <h1 class="approval-title">Approval Job Description</h1>
+            <p class="approval-desc">
+                Halaman ini digunakan untuk melihat status approval, versi job description, QR approval, dan penerapan job description ke pegawai aktif.
+            </p>
         </div>
 
-        <div class="row g-4">
-            {{-- DATA JABATAN --}}
-            <div class="col-lg-6">
-                <div class="approval-card">
-                    <div class="approval-card-header">
-                        <i class="bi bi-briefcase"></i>
-                        Data Jabatan
-                    </div>
+        <div class="approval-actions">
+            @if(in_array($prefix, ['admin', 'hcm'], true))
+                <a href="{{ route($prefix.'.jabatan.show', $jabatan->id_jabatan) }}" class="approval-btn">
+                    Kembali ke Detail Jabatan
+                </a>
+            @endif
+        </div>
+    </div>
 
-                    <div class="approval-card-body">
-                        <table class="approval-table">
-                            <tr>
-                                <th>Nama Jabatan</th>
-                                <td>{{ $jabatan->nama_jabatan ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Departemen</th>
-                                <td>{{ $jabatan->departemen ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Golongan Jabatan</th>
-                                <td>{{ $jabatan->gol_jabatan ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Home Base</th>
-                                <td>{{ $jabatan->home_base ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Lokasi Kerja</th>
-                                <td>{{ $jabatan->lokasi_kerja ?? '-' }}</td>
-                            </tr>
-                        </table>
-                    </div>
+    <div class="approval-panel-body">
+        @if(session('success_auto'))
+            <div class="approval-alert success">
+                {{ session('success_auto') }}
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="approval-alert danger">
+                <strong>Periksa kembali data berikut:</strong>
+                <ul style="margin:8px 0 0; padding-left:18px;">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @if(!empty($isLocalApprovalUrl))
+            <div class="approval-alert warning">
+                Link approval saat ini masih memakai alamat lokal/private. QR hanya bisa dibuka dari perangkat yang berada di jaringan yang sama.
+                Agar bisa dibuka dari jaringan berbeda, gunakan domain publik, ngrok, Cloudflare Tunnel, atau server yang dapat diakses publik lalu isi <strong>APP_APPROVAL_URL</strong> di file <strong>.env</strong>.
+            </div>
+        @endif
+
+        <div class="approval-alert info">
+            Alur approval corporate: perubahan job description dibuat sebagai <strong>pending version</strong>.
+            Jika approver login sebagai <strong>pegawai</strong>, approval akan dicatat terlebih dahulu dan menunggu pengesahan final dari HCM.
+            Jika approver login sebagai <strong>HCM</strong>, approval langsung menjadi final.
+        </div>
+
+        <div class="approval-grid-2">
+            <div class="approval-card">
+                <div class="approval-card-title">Data Jabatan</div>
+                <div class="approval-card-body">
+                    <table class="approval-table">
+                        <tr>
+                            <th>Nama Jabatan</th>
+                            <td>{{ $jabatan->nama_jabatan ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Departemen</th>
+                            <td>{{ $jabatan->departemen ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Golongan Jabatan</th>
+                            <td>{{ $jabatan->gol_jabatan ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Home Base</th>
+                            <td>{{ $jabatan->home_base ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Lokasi Kerja</th>
+                            <td>{{ $jabatan->lokasi_kerja ?? '-' }}</td>
+                        </tr>
+                    </table>
                 </div>
             </div>
 
-            {{-- STATUS APPROVAL --}}
-            <div class="col-lg-6">
-                <div class="approval-card">
-                    <div class="approval-card-header">
-                        <i class="bi bi-shield-check"></i>
-                        Status Approval
-                    </div>
+            <div class="approval-card">
+                <div class="approval-card-title">Status Versi Job Description</div>
+                <div class="approval-card-body">
+                    <table class="approval-table">
+                        <tr>
+                            <th>Versi Resmi Aktif</th>
+                            <td>{{ $activeVersion ? 'Versi '.$activeVersion->version_number : '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Versi Menunggu Approval</th>
+                            <td>{{ $pendingVersion ? 'Versi '.$pendingVersion->version_number : '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Status Approval</th>
+                            <td>
+                                @if($approvalStatus === 'approved' && !$pendingVersion)
+                                    <span class="approval-badge approved">Approved Final</span>
+                                @elseif($approvalFlowStatus === 'waiting_hcm_confirmation')
+                                    <span class="approval-badge pending">Menunggu Pengesahan HCM</span>
+                                @elseif($approvalStatus === 'rejected')
+                                    <span class="approval-badge danger">Rejected</span>
+                                @else
+                                    <span class="approval-badge pending">Pending Approval</span>
+                                @endif
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Approver Awal</th>
+                            <td>{{ $jabatan->proposed_approved_by_name ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Jabatan Approver</th>
+                            <td>{{ $jabatan->proposed_approved_by_jabatan ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Waktu Approval Awal</th>
+                            <td>{{ $proposedApprovalDate }}</td>
+                        </tr>
+                        <tr>
+                            <th>Disahkan HCM Oleh</th>
+                            <td>{{ $jabatan->hcm_confirmed_by_name ?? '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Waktu Pengesahan HCM</th>
+                            <td>{{ $hcmConfirmedDate }}</td>
+                        </tr>
+                        <tr>
+                            <th>Terakhir Diperbarui</th>
+                            <td>{{ $lastUpdatedDate }}</td>
+                        </tr>
+                    </table>
 
-                    <div class="approval-card-body">
-                        <table class="approval-table">
-                            <tr>
-                                <th>Status</th>
-                                <td>
-                                    @if($approvalStatus === 'approved')
-                                        <span class="approval-badge approved">Approved</span>
-                                    @else
-                                        <span class="approval-badge pending">Pending Approval</span>
-                                    @endif
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Disetujui Oleh</th>
-                                <td>{{ $jabatan->approved_by_name ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Role Approver</th>
-                                <td>{{ $jabatan->approved_by_role ? strtoupper($jabatan->approved_by_role) : '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Jabatan Approver</th>
-                                <td>{{ $jabatan->approved_by_jabatan ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Departemen Approver</th>
-                                <td>{{ $jabatan->approved_by_departemen ?? '-' }}</td>
-                            </tr>
-                            <tr>
-                                <th>Tanggal Approval</th>
-                                <td>{{ $approvalDate }}</td>
-                            </tr>
-                            <tr>
-                                <th>Catatan</th>
-                                <td>{{ $jabatan->approval_catatan ?? '-' }}</td>
-                            </tr>
-                        </table>
-                    </div>
+                    @if($approvalFlowStatus === 'waiting_hcm_confirmation' && $pendingVersion && $prefix === 'hcm')
+                        <form method="POST"
+                              action="{{ route('jabatan.approval.confirm-final', ['jabatan' => $jabatan->id_jabatan, 'token' => $jabatan->approval_token]) }}"
+                              style="margin-top:14px;"
+                              onsubmit="return confirm('Sahkan approval pegawai ini sebagai approval final?');">
+                            @csrf
+
+                            <label class="approval-form-label">Catatan Pengesahan HCM <span style="color:#98a2b3;">(opsional)</span></label>
+                            <textarea name="hcm_confirmation_catatan" class="approval-textarea" placeholder="Tambahkan catatan jika diperlukan..."></textarea>
+
+                            <label class="approval-form-label" style="margin-top:14px;">Password HCM <span style="color:#dc2626;">*</span></label>
+                            <input type="password"
+                                   name="approval_password"
+                                   class="approval-input"
+                                   placeholder="Masukkan password HCM"
+                                   autocomplete="current-password"
+                                   required>
+
+                            <button type="submit" class="approval-btn success" style="margin-top:14px;">
+                                Sahkan Approval Final
+                            </button>
+                        </form>
+                    @endif
+
+                    @if($activeVersion && !$pendingVersion && in_array($prefix, ['admin', 'hcm'], true))
+                        <form method="POST"
+                              action="{{ route($prefix.'.jabatan.apply-approved-version', $jabatan->id_jabatan) }}"
+                              style="margin-top:14px;">
+                            @csrf
+                            <button type="submit"
+                                    class="approval-btn success"
+                                    onclick="return confirm('Terapkan versi approved terbaru ke seluruh pegawai aktif yang memegang jabatan ini? Riwayat versi lama pegawai tetap disimpan.');">
+                                Terapkan ke Pegawai Aktif
+                            </button>
+                        </form>
+                    @endif
                 </div>
             </div>
+        </div>
 
-            {{-- QR APPROVAL --}}
-            <div class="col-lg-12">
-                <div class="approval-card">
-                    <div class="approval-card-header">
-                        <i class="bi bi-qr-code"></i>
-                        QR Approval
-                    </div>
+        <div class="approval-grid-1" style="margin-top:18px;">
+            <div class="approval-card">
+                <div class="approval-card-title">
+                    <span>QR Approval</span>
+                    @if($approvalToken)
+                        <a href="{{ route('jabatan.approval.qr', $jabatan->id_jabatan) }}" target="_blank" class="approval-btn" style="min-height:34px; padding:7px 12px; font-size:12px;">
+                            Buka QR SVG
+                        </a>
+                    @endif
+                </div>
 
-                    <div class="approval-qr-body">
-                        <div class="approval-qr-box">
+                <div class="approval-card-body">
+                    @if($approvalToken)
+                        <div class="approval-qr-wrap">
+                            <div class="approval-qr-box">
+                                <img src="{{ $qrUrl }}" alt="QR Approval Job Description">
+                            </div>
 
-                            @if($approvalToken)
-                                <div id="approvalQrCode" class="approval-qr-img"></div>
+                            <div class="approval-note">
+                                Scan QR ini menggunakan akun HCM atau pegawai yang berwenang.
+                                Jika yang approve adalah pegawai, status akan menunggu pengesahan final dari HCM.
+                            </div>
 
-                                <div class="approval-qr-note">
-                                    Scan QR ini menggunakan handphone approver. Setelah scan,
-                                    sistem akan membuka halaman approval.
-                                </div>
-
-                                <div class="approval-qr-warning">
-                                    QR ini hanya berisi link token approval, bukan data sensitif pegawai atau jabatan.
-                                </div>
-
-                                <div class="approval-link-box mt-3">
-                                    <div class="small text-muted mb-1">Link Approval:</div>
-                                    <input type="text"
-                                           class="form-control approval-link-input"
-                                           value="{{ $approvalUrl }}"
-                                           readonly>
-                                </div>
-                            @else
-                                <div class="approval-empty-qr">
-                                    <i class="bi bi-exclamation-triangle"></i>
-                                    <h5>Token approval belum tersedia</h5>
-                                    <p>Refresh halaman ini atau pastikan controller sudah membuat approval_token.</p>
-                                </div>
-                            @endif
-
+                            <div class="approval-link-row" style="width:100%; max-width:760px;">
+                                <input type="text" id="approvalLinkInput" class="approval-input" value="{{ $approvalUrl }}" readonly>
+                                <button type="button" class="approval-btn primary" onclick="copyApprovalLink()">Copy Link</button>
+                            </div>
                         </div>
-                    </div>
+                    @else
+                        <div class="approval-alert warning" style="margin-bottom:0;">
+                            Token approval belum tersedia. Refresh halaman ini atau pastikan controller sudah membuat approval_token.
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
-
     </div>
 </div>
-
-<style>
-.approval-page{
-    min-height:100vh;
-    background:#f6f8f4;
-}
-
-.approval-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:16px;
-    flex-wrap:wrap;
-}
-
-.approval-eyebrow{
-    color:#6b775c;
-    font-size:11px;
-    font-weight:800;
-    letter-spacing:2px;
-    margin-bottom:8px;
-}
-
-.approval-title{
-    font-weight:800;
-    color:#27351e;
-}
-
-.approval-card{
-    background:#fff;
-    border:1px solid #d7dfcc;
-    border-radius:18px;
-    overflow:hidden;
-    box-shadow:0 12px 30px rgba(30,41,59,.06);
-}
-
-.approval-card-header{
-    background:#e7eddc;
-    color:#27351e;
-    font-weight:800;
-    padding:14px 18px;
-    display:flex;
-    align-items:center;
-    gap:8px;
-    border-bottom:1px solid #d7dfcc;
-}
-
-.approval-card-body{
-    padding:18px;
-}
-
-.approval-table{
-    width:100%;
-    border-collapse:collapse;
-}
-
-.approval-table th,
-.approval-table td{
-    border:1px solid #d7dfcc;
-    padding:12px 14px;
-    vertical-align:top;
-    font-size:14px;
-}
-
-.approval-table th{
-    width:38%;
-    background:#f7f9f2;
-    color:#344054;
-    font-weight:800;
-}
-
-.approval-table td{
-    font-weight:600;
-    color:#111827;
-}
-
-.approval-badge{
-    display:inline-flex;
-    padding:6px 14px;
-    border-radius:999px;
-    font-size:12px;
-    font-weight:800;
-}
-
-.approval-badge.approved{
-    background:#dcfce7;
-    color:#166534;
-    border:1px solid #86efac;
-}
-
-.approval-badge.pending{
-    background:#fef3c7;
-    color:#92400e;
-    border:1px solid #fde68a;
-}
-
-.approval-qr-body{
-    padding:32px 18px;
-    display:flex;
-    justify-content:center;
-}
-
-.approval-qr-box{
-    max-width:520px;
-    width:100%;
-    text-align:center;
-}
-
-.approval-qr-img{
-    width:260px;
-    height:260px;
-    margin:0 auto;
-    padding:14px;
-    background:#fff;
-    border:1px solid #d7dfcc;
-    border-radius:18px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-}
-
-.approval-qr-img canvas,
-.approval-qr-img img{
-    max-width:100%;
-    max-height:100%;
-}
-
-.approval-qr-note{
-    margin-top:16px;
-    font-size:14px;
-    color:#475467;
-    line-height:1.6;
-}
-
-.approval-qr-warning{
-    margin:14px auto 0;
-    font-size:12px;
-    color:#667085;
-    background:#f7f9f2;
-    border:1px solid #d7dfcc;
-    border-radius:12px;
-    padding:10px 12px;
-    max-width:420px;
-}
-
-.approval-link-box{
-    max-width:520px;
-    margin:0 auto;
-}
-
-.approval-link-input{
-    border-radius:12px;
-    font-size:13px;
-    text-align:center;
-}
-
-.approval-empty-qr{
-    border:1px dashed #d7dfcc;
-    border-radius:18px;
-    padding:28px 20px;
-    background:#fbfcf8;
-    color:#667085;
-}
-
-.approval-empty-qr i{
-    font-size:36px;
-    color:#92400e;
-    margin-bottom:10px;
-}
-
-.approval-empty-qr h5{
-    font-weight:800;
-    color:#27351e;
-    margin-bottom:6px;
-}
-
-.approval-empty-qr p{
-    margin-bottom:0;
-}
-
-@media(max-width:768px){
-    .approval-header{
-        flex-direction:column;
-    }
-
-    .approval-table th,
-    .approval-table td{
-        display:block;
-        width:100%;
-    }
-
-    .approval-table th{
-        border-bottom:none;
-    }
-
-    .approval-qr-img{
-        width:220px;
-        height:220px;
-    }
-}
-</style>
-
-@if($approvalToken)
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const qrTarget = document.getElementById('approvalQrCode');
-        const approvalUrl = @json($approvalUrl);
-
-        if (qrTarget && approvalUrl) {
-            qrTarget.innerHTML = '';
-
-            new QRCode(qrTarget, {
-                text: approvalUrl,
-                width: 220,
-                height: 220,
-                colorDark: '#111827',
-                colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.M
-            });
-        }
-    });
-    </script>
-@endif
 @endsection
+
+@push('scripts')
+<script>
+function copyApprovalLink(){
+    const input = document.getElementById('approvalLinkInput');
+    if (!input) return;
+
+    input.select();
+    input.setSelectionRange(0, 99999);
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value).then(function(){
+            alert('Link approval berhasil disalin.');
+        }).catch(function(){
+            document.execCommand('copy');
+            alert('Link approval berhasil disalin.');
+        });
+    } else {
+        document.execCommand('copy');
+        alert('Link approval berhasil disalin.');
+    }
+}
+</script>
+@endpush

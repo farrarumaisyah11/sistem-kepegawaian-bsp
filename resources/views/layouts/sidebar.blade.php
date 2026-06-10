@@ -3,7 +3,8 @@
         width: var(--sidebar-width);
         height: 100vh;
         position: fixed;
-        top: 0; left: 0;
+        top: 0;
+        left: 0;
         z-index: 1050;
         background: linear-gradient(180deg, var(--olive-700), var(--olive-950));
         transition: var(--transition);
@@ -21,8 +22,15 @@
         border-bottom: 1px solid rgba(255,255,255,0.1);
     }
 
-    .logo-lg { width: 140px; display: block; }
-    .logo-sm { width: 38px; display: none; }
+    .logo-lg {
+        width: 140px;
+        display: block;
+    }
+
+    .logo-sm {
+        width: 38px;
+        display: none;
+    }
 
     .menu-scroll {
         flex-grow: 1;
@@ -49,11 +57,49 @@
         margin-bottom: 5px;
         position: relative;
         transition: 0.2s ease;
+        width: 100%;
+        min-height: 44px;
     }
 
     .menu-link i {
         font-size: 18px;
         min-width: 32px;
+        flex-shrink: 0;
+    }
+
+    .nav-txt {
+        display: block;
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: clip;
+    }
+
+    .menu-link.has-badge {
+        padding-right: 46px;
+    }
+
+    .menu-link.has-badge .nav-txt {
+        font-size: 13.5px;
+        letter-spacing: -0.2px;
+    }
+
+    .menu-badge {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 10px;
+        min-width: 22px;
+        height: 18px;
+        padding: 3px 6px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        z-index: 2;
     }
 
     .menu-link:hover,
@@ -74,6 +120,23 @@
 
     body.sidebar-mini .logo-sm {
         display: block;
+    }
+
+    body.sidebar-mini .menu-link {
+        justify-content: center;
+        padding: 12px;
+    }
+
+    body.sidebar-mini .menu-link.has-badge {
+        padding: 12px;
+    }
+
+    body.sidebar-mini .menu-link i {
+        min-width: 0;
+    }
+
+    body.sidebar-mini .menu-badge {
+        display: none;
     }
 
     body.sidebar-mini .menu-link:hover::after {
@@ -101,11 +164,6 @@
         border: none;
         width: 100%;
         text-align: left;
-    }
-
-    .menu-badge {
-        font-size: 10px;
-        margin-left: auto;
     }
 </style>
 
@@ -156,7 +214,7 @@
                 <div class="menu-section">Approval</div>
 
                 <a href="{{ route('admin.pengajuan.index') }}"
-                   class="menu-link {{ request()->routeIs('admin.pengajuan.*') ? 'active' : '' }}"
+                   class="menu-link has-badge {{ request()->routeIs('admin.pengajuan.*') ? 'active' : '' }}"
                    data-name="Pengajuan Perubahan">
                     <i class="bi bi-envelope-paper"></i>
                     <span class="nav-txt">Pengajuan Perubahan</span>
@@ -206,7 +264,7 @@
                 </a>
 
                 <a href="{{ route('hcm.pengajuan.index') }}"
-                   class="menu-link {{ request()->routeIs('hcm.pengajuan.*') ? 'active' : '' }}"
+                   class="menu-link has-badge {{ request()->routeIs('hcm.pengajuan.*') ? 'active' : '' }}"
                    data-name="Pengajuan Perubahan">
                     <i class="bi bi-envelope-paper"></i>
                     <span class="nav-txt">Pengajuan Perubahan</span>
@@ -217,8 +275,7 @@
                         </span>
                     @endif
                 </a>
-
-                @endif
+            @endif
 
             {{-- ROLE PEGAWAI --}}
             @if($role === 'pegawai')
@@ -232,8 +289,8 @@
                 </a>
 
                 <a href="{{ route('pegawai.job-description') }}"
-                class="menu-link {{ request()->routeIs('pegawai.job-description') ? 'active' : '' }}"
-                data-name="Job Description">
+                   class="menu-link {{ request()->routeIs('pegawai.job-description') ? 'active' : '' }}"
+                   data-name="Job Description">
                     <i class="bi bi-briefcase"></i>
                     <span class="nav-txt">Job Description</span>
                 </a>

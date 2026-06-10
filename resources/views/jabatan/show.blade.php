@@ -3,12 +3,14 @@
 
 @section('content')
 @if ($errors->any())
-    <div class="alert alert-danger rounded-4 shadow-sm">
-        <ul class="mb-0 ps-3">
-            @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
+    <div class="container-xl d-print-none mt-3">
+        <div class="alert alert-danger rounded-4 shadow-sm">
+            <ul class="mb-0 ps-3">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
     </div>
 @endif
 
@@ -57,6 +59,50 @@
 
         return count($result) ? $result : ['-'];
     };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Approval Display
+    |--------------------------------------------------------------------------
+    | Ditampilkan di show, print, dan download PDF.
+    | Ringkasan kecil muncul di kop setiap halaman.
+    | Detail lengkap ditampilkan pada kartu approval dan blok pengesahan bawah.
+    |--------------------------------------------------------------------------
+    */
+    $approvalStatus = $j->approval_status ?? 'pending';
+
+    $approvalStatusText = match ($approvalStatus) {
+        'approved' => 'Approved',
+        'rejected' => 'Rejected',
+        'pending' => 'Pending Approval',
+        default => 'Pending Approval',
+    };
+
+    $approvalStatusClass = match ($approvalStatus) {
+        'approved' => 'approved',
+        'rejected' => 'rejected',
+        'pending' => 'pending',
+        default => 'pending',
+    };
+
+    $isApproved = $approvalStatus === 'approved';
+
+    $approvalDate = '-';
+    if (!empty($j->approved_at)) {
+        try {
+            $approvalDate = \Illuminate\Support\Carbon::parse($j->approved_at)
+                ->locale('id')
+                ->translatedFormat('d F Y H:i');
+        } catch (\Throwable $e) {
+            $approvalDate = $j->approved_at;
+        }
+    }
+
+    $approvedByName = $j->approved_by_name ?? '-';
+    $approvedByRole = !empty($j->approved_by_role) ? strtoupper($j->approved_by_role) : '-';
+    $approvedByJabatan = $j->approved_by_jabatan ?? '-';
+    $approvedByDepartemen = $j->approved_by_departemen ?? '-';
+    $approvalCatatan = $j->approval_catatan ?? '-';
 @endphp
 
 <div class="jd-page">
@@ -78,7 +124,7 @@
                         <i class="bi bi-shield-check"></i> Approval
                     </a>
 
-                    <button type="button" onclick="window.print()" class="btn btn-primary jd-btn">
+                    <button type="button" onclick="printJabatanA4()" class="btn btn-primary jd-btn">
                         <i class="bi bi-printer"></i> Print
                     </button>
 
@@ -105,9 +151,8 @@
                 </p>
             </div>
         @else
-
             {{-- HEADER --}}
-            <div class="jd-paper-header">
+            <div class="jd-paper-header" data-export-header="true">
                 <div class="jd-header-grid">
                     <div class="jd-logo-box">
                         <img src="{{ asset('images/logo skk migas.png') }}" alt="SKK Migas">
@@ -132,13 +177,23 @@
                 <div class="jd-title-wrap">
                     <div class="jd-title">JOB DESCRIPTION</div>
                     <div class="jd-subtitle">Laporan Data Jabatan</div>
+
+                    <div class="jd-approval-mini {{ $approvalStatusClass }}">
+                        @if($isApproved)
+                            <span class="jd-approval-dot"></span>
+                            Approved oleh {{ $approvedByName }} pada {{ $approvalDate }}
+                        @else
+                            <span class="jd-approval-dot"></span>
+                            {{ $approvalStatusText }}
+                        @endif
+                    </div>
                 </div>
             </div>
 
-            <div class="jd-paper-body">
+            <div class="jd-paper-body" id="jabatan-content-source">
 
                 {{-- PROFIL JABATAN --}}
-                <div class="jd-profile-card jd-section-keep">
+                <div class="jd-profile-card jd-export-item jd-avoid-break">
                     <div class="jd-profile-badge">PROFIL JABATAN</div>
 
                     <h2>{{ $j->nama_jabatan ?? '-' }}</h2>
@@ -153,10 +208,81 @@
                         <span class="jd-chip">{{ $j->lokasi_kerja ?? 'Lokasi Kerja -' }}</span>
                         <span class="jd-chip">Parent: {{ $j->parent_jabatan ?? '-' }}</span>
                     </div>
+
+                    <div class="jd-profile-approval-row">
+                        <span class="jd-approval-badge {{ $approvalStatusClass }}">
+                            {{ $approvalStatusText }}
+                        </span>
+
+                        @if($isApproved)
+                            <span class="jd-profile-approval-text">
+                                Disetujui oleh <strong>{{ $approvedByName }}</strong> pada <strong>{{ $approvalDate }}</strong>
+                            </span>
+                        @else
+                            <span class="jd-profile-approval-text">
+                                Dokumen ini belum mendapatkan approval final.
+                            </span>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- STATUS APPROVAL --}}
+                <div class="jd-section-block jd-export-item jd-avoid-break">
+                    <div class="jd-section-heading">
+                        <i class="bi bi-shield-check"></i>
+                        Status Approval Job Description
+                    </div>
+
+                    <div class="jd-approval-summary">
+                        <div class="jd-approval-summary-main">
+                            <span class="jd-approval-badge {{ $approvalStatusClass }}">
+                                {{ $approvalStatusText }}
+                            </span>
+
+                            @if($isApproved)
+                                <div>
+                                    <div class="jd-approval-summary-title">Dokumen sudah disetujui</div>
+                                    <div class="jd-approval-summary-desc">
+                                        Approval tercatat otomatis oleh sistem berdasarkan akun approver.
+                                    </div>
+                                </div>
+                            @else
+                                <div>
+                                    <div class="jd-approval-summary-title">Dokumen belum disetujui</div>
+                                    <div class="jd-approval-summary-desc">
+                                        Job description masih menunggu proses approval.
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+
+                        <table class="jd-approval-table">
+                            <tbody>
+                                <tr>
+                                    <th>Disetujui Oleh</th>
+                                    <td>{{ $approvedByName }}</td>
+                                    <th>Tanggal & Jam</th>
+                                    <td>{{ $approvalDate }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Role Approver</th>
+                                    <td>{{ $approvedByRole }}</td>
+                                    <th>Jabatan Approver</th>
+                                    <td>{{ $approvedByJabatan }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Departemen Approver</th>
+                                    <td>{{ $approvedByDepartemen }}</td>
+                                    <th>Catatan</th>
+                                    <td>{{ $approvalCatatan }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 {{-- INFORMASI UMUM --}}
-                <div class="jd-section-block jd-section-keep">
+                <div class="jd-section-block jd-export-item jd-avoid-break">
                     <div class="jd-section-heading">
                         <i class="bi bi-card-list"></i>
                         Informasi Umum Jabatan
@@ -187,7 +313,7 @@
                 </div>
 
                 {{-- TUJUAN JABATAN --}}
-                <div class="jd-section-block jd-section-keep">
+                <div class="jd-section-block jd-export-item jd-avoid-break">
                     <div class="jd-section-heading">
                         <i class="bi bi-bullseye"></i>
                         Tujuan Jabatan
@@ -199,7 +325,7 @@
                 </div>
 
                 {{-- TANGGUNG JAWAB --}}
-                <div class="jd-section-block">
+                <div class="jd-section-block jd-export-item jd-avoid-break">
                     <div class="jd-section-heading">
                         <i class="bi bi-list-check"></i>
                         Tanggung Jawab Jabatan
@@ -215,7 +341,7 @@
                 </div>
 
                 {{-- TANTANGAN --}}
-                <div class="jd-section-block">
+                <div class="jd-section-block jd-export-item jd-avoid-break">
                     <div class="jd-section-heading">
                         <i class="bi bi-exclamation-triangle"></i>
                         Tantangan Jabatan
@@ -231,14 +357,14 @@
                 </div>
 
                 {{-- DIMENSI DAN WEWENANG --}}
-                <div class="jd-section-block jd-section-keep">
+                <div class="jd-section-block jd-export-item jd-avoid-break">
                     <div class="jd-section-heading">
                         <i class="bi bi-diagram-3"></i>
                         Dimensi dan Wewenang
                     </div>
 
                     <div class="jd-grid-2">
-                        <div class="jd-card">
+                        <div class="jd-card jd-avoid-break">
                             <div class="jd-card-title">Dimensi Jabatan</div>
 
                             <table class="jd-info-table">
@@ -257,7 +383,7 @@
                             </table>
                         </div>
 
-                        <div class="jd-card">
+                        <div class="jd-card jd-avoid-break">
                             <div class="jd-card-title">Wewenang</div>
 
                             <table class="jd-info-table">
@@ -275,14 +401,14 @@
                 </div>
 
                 {{-- HUBUNGAN KERJA --}}
-                <div class="jd-section-block">
+                <div class="jd-section-block jd-export-item jd-avoid-break">
                     <div class="jd-section-heading">
                         <i class="bi bi-people"></i>
                         Hubungan Kerja
                     </div>
 
                     <div class="jd-grid-2">
-                        <div class="jd-card">
+                        <div class="jd-card jd-avoid-break">
                             <div class="jd-card-title">Internal Perusahaan</div>
 
                             <div class="jd-text-inside">
@@ -294,7 +420,7 @@
                             </div>
                         </div>
 
-                        <div class="jd-card">
+                        <div class="jd-card jd-avoid-break">
                             <div class="jd-card-title">Eksternal Perusahaan</div>
 
                             <div class="jd-text-inside">
@@ -309,14 +435,14 @@
                 </div>
 
                 {{-- PERSYARATAN --}}
-                <div class="jd-section-block">
+                <div class="jd-section-block jd-export-item jd-avoid-break">
                     <div class="jd-section-heading">
                         <i class="bi bi-award"></i>
                         Persyaratan Jabatan
                     </div>
 
                     <div class="jd-grid-2">
-                        <div class="jd-card">
+                        <div class="jd-card jd-avoid-break">
                             <div class="jd-card-title">Pengetahuan & Keterampilan</div>
 
                             <div class="jd-text-inside">
@@ -328,7 +454,7 @@
                             </div>
                         </div>
 
-                        <div class="jd-card">
+                        <div class="jd-card jd-avoid-break">
                             <div class="jd-card-title">Kompetensi</div>
 
                             <div class="jd-text-inside">
@@ -342,7 +468,7 @@
                     </div>
 
                     <div class="jd-grid-1">
-                        <div class="jd-card">
+                        <div class="jd-card jd-avoid-break">
                             <div class="jd-card-title">Syarat Kompetensi Jabatan</div>
 
                             <div class="jd-text-inside">
@@ -358,7 +484,7 @@
 
                 {{-- STRUKTUR ORGANISASI --}}
                 @if(!empty($j->struktur_file))
-                    <div class="jd-section-block jd-section-keep">
+                    <div class="jd-section-block jd-export-item jd-avoid-break">
                         <div class="jd-section-heading">
                             <i class="bi bi-building"></i>
                             Struktur Organisasi
@@ -382,12 +508,38 @@
                     </div>
                 @endif
 
-                <div class="jd-footer-note">
-                    Dokumen ini dihasilkan oleh Sistem Informasi SDM PT. Bumi Siak Pusako.
+                <div class="jd-footer-note jd-export-item jd-avoid-break">
+                    <div class="jd-approval-signoff {{ $approvalStatusClass }}">
+                        @if($isApproved)
+                            <div class="jd-signoff-label">PENGESAHAN DOKUMEN</div>
+                            <div class="jd-signoff-status">APPROVED</div>
+                            <div class="jd-signoff-meta">
+                                Disetujui oleh <strong>{{ $approvedByName }}</strong>
+                                sebagai <strong>{{ $approvedByJabatan }}</strong>
+                                pada <strong>{{ $approvalDate }}</strong>.
+                            </div>
+                            <div class="jd-signoff-meta">
+                                Departemen: {{ $approvedByDepartemen }} • Role: {{ $approvedByRole }}
+                            </div>
+                        @else
+                            <div class="jd-signoff-label">STATUS DOKUMEN</div>
+                            <div class="jd-signoff-status">PENDING APPROVAL</div>
+                            <div class="jd-signoff-meta">
+                                Dokumen ini belum memperoleh approval final.
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="jd-footer-system-note">
+                        Dokumen ini dihasilkan oleh Sistem Informasi SDM PT. Bumi Siak Pusako.
+                    </div>
                 </div>
             </div>
         @endif
     </div>
+
+    {{-- Area ini khusus hasil susunan halaman untuk Print dan Download PDF. Jangan dihapus. --}}
+    <div id="jabatan-export-root" class="jd-export-root" aria-hidden="true"></div>
 </div>
 
 <style>
@@ -449,6 +601,7 @@ html, body{
     padding:10mm 12mm 5mm 12mm;
     border-bottom:1px solid var(--jd-border-strong);
     background:#ffffff;
+    box-sizing:border-box;
 }
 
 .jd-header-grid{
@@ -525,9 +678,54 @@ html, body{
     color:var(--jd-muted);
 }
 
+.jd-approval-mini{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    margin-top:8px;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:9px;
+    font-weight:800;
+    line-height:1.25;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    border:1px solid transparent;
+    max-width:100%;
+}
+
+.jd-approval-mini.approved{
+    background:#ecfdf3;
+    color:#067647;
+    border-color:#abefc6;
+}
+
+.jd-approval-mini.pending{
+    background:#fffaeb;
+    color:#b54708;
+    border-color:#fedf89;
+}
+
+.jd-approval-mini.rejected{
+    background:#fef3f2;
+    color:#b42318;
+    border-color:#fecdca;
+}
+
+.jd-approval-dot{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:currentColor;
+    display:inline-flex;
+    flex:0 0 auto;
+}
+
 .jd-paper-body{
     padding:6mm 12mm 9mm 12mm;
     background:#ffffff;
+    box-sizing:border-box;
 }
 
 .jd-profile-card{
@@ -536,6 +734,7 @@ html, body{
     padding:18px 20px;
     margin-bottom:14px;
     background:linear-gradient(180deg,#ffffff,#fbfcf8);
+    box-sizing:border-box;
 }
 
 .jd-profile-badge{
@@ -557,6 +756,7 @@ html, body{
     line-height:1.2;
     font-weight:800;
     color:#0f172a;
+    word-break:break-word;
 }
 
 .jd-profile-meta{
@@ -565,6 +765,7 @@ html, body{
     gap:12px 18px;
     margin-top:10px;
     font-size:13px;
+    line-height:1.45;
     color:#1f2937;
 }
 
@@ -589,6 +790,118 @@ html, body{
     color:#344054;
     font-size:11px;
     font-weight:700;
+    line-height:1.2;
+    word-break:break-word;
+}
+
+.jd-profile-approval-row{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px dashed var(--jd-border);
+}
+
+.jd-profile-approval-text{
+    font-size:11px;
+    color:#475467;
+    line-height:1.45;
+    font-weight:600;
+}
+
+.jd-approval-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    padding:7px 14px;
+    font-size:10px;
+    font-weight:900;
+    line-height:1.2;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    border:1px solid transparent;
+    white-space:nowrap;
+}
+
+.jd-approval-badge.approved{
+    background:#dcfce7;
+    color:#166534;
+    border-color:#86efac;
+}
+
+.jd-approval-badge.pending{
+    background:#fef3c7;
+    color:#92400e;
+    border-color:#fde68a;
+}
+
+.jd-approval-badge.rejected{
+    background:#fee2e2;
+    color:#991b1b;
+    border-color:#fecaca;
+}
+
+.jd-approval-summary{
+    padding:14px;
+}
+
+.jd-approval-summary-main{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px;
+    border:1px solid var(--jd-border);
+    border-radius:12px;
+    background:#fbfcf8;
+    margin-bottom:12px;
+}
+
+.jd-approval-summary-title{
+    font-size:13px;
+    font-weight:900;
+    color:#111827;
+    line-height:1.3;
+}
+
+.jd-approval-summary-desc{
+    margin-top:2px;
+    font-size:11px;
+    font-weight:600;
+    color:#667085;
+    line-height:1.45;
+}
+
+.jd-approval-table{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+}
+
+.jd-approval-table th,
+.jd-approval-table td{
+    border:1px solid var(--jd-border);
+    padding:9px 10px;
+    vertical-align:top;
+    font-size:11px;
+    line-height:1.45;
+}
+
+.jd-approval-table th{
+    width:22%;
+    background:var(--jd-primary-soft-2);
+    color:var(--jd-label);
+    font-weight:900;
+    text-align:left;
+}
+
+.jd-approval-table td{
+    font-weight:700;
+    color:#111827;
+    word-break:break-word;
+    overflow-wrap:anywhere;
 }
 
 .jd-section-block{
@@ -597,11 +910,7 @@ html, body{
     border-radius:14px;
     background:#ffffff;
     overflow:hidden;
-}
-
-.jd-section-keep{
-    page-break-inside:avoid;
-    break-inside:avoid;
+    box-sizing:border-box;
 }
 
 .jd-section-heading{
@@ -615,7 +924,7 @@ html, body{
     font-weight:800;
     letter-spacing:.02em;
     color:#27351e;
-    text-transform:none;
+    line-height:1.25;
 }
 
 .jd-section-heading i{
@@ -662,6 +971,7 @@ html, body{
     font-weight:600;
     color:#111827;
     word-break:break-word;
+    overflow-wrap:anywhere;
 }
 
 .jd-text-block,
@@ -671,6 +981,8 @@ html, body{
     line-height:1.75;
     color:#111827;
     text-align:justify;
+    word-break:break-word;
+    overflow-wrap:anywhere;
 }
 
 .jd-list-block{
@@ -687,6 +999,8 @@ html, body{
 
 .jd-list li{
     margin-bottom:6px;
+    break-inside:avoid;
+    page-break-inside:avoid;
 }
 
 .jd-list-plain{
@@ -709,8 +1023,7 @@ html, body{
     border-radius:12px;
     background:#ffffff;
     overflow:hidden;
-    break-inside:avoid;
-    page-break-inside:avoid;
+    box-sizing:border-box;
 }
 
 .jd-card-title{
@@ -720,6 +1033,7 @@ html, body{
     font-size:12px;
     font-weight:800;
     color:#27351e;
+    line-height:1.25;
 }
 
 .jd-org-box{
@@ -729,7 +1043,7 @@ html, body{
 
 .jd-org-image{
     max-width:100%;
-    max-height:560px;
+    max-height:520px;
     object-fit:contain;
     border:1px solid var(--jd-border);
     border-radius:12px;
@@ -739,6 +1053,61 @@ html, body{
     margin-top:16px;
     padding-top:12px;
     border-top:1px solid #d1d5db;
+    text-align:center;
+    font-size:11px;
+    color:#6b7280;
+}
+
+.jd-approval-signoff{
+    border:1px solid var(--jd-border);
+    border-radius:14px;
+    padding:14px 16px;
+    margin-bottom:12px;
+    background:#fbfcf8;
+    text-align:left;
+}
+
+.jd-approval-signoff.approved{
+    border-color:#86efac;
+    background:#f0fdf4;
+}
+
+.jd-approval-signoff.pending{
+    border-color:#fde68a;
+    background:#fffbeb;
+}
+
+.jd-approval-signoff.rejected{
+    border-color:#fecaca;
+    background:#fef2f2;
+}
+
+.jd-signoff-label{
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:.12em;
+    color:#667085;
+    text-transform:uppercase;
+    margin-bottom:4px;
+}
+
+.jd-signoff-status{
+    font-size:15px;
+    font-weight:900;
+    letter-spacing:.08em;
+    color:#111827;
+    text-transform:uppercase;
+    margin-bottom:6px;
+}
+
+.jd-signoff-meta{
+    font-size:11px;
+    line-height:1.55;
+    color:#344054;
+    font-weight:600;
+}
+
+.jd-footer-system-note{
     text-align:center;
     font-size:11px;
     color:#6b7280;
@@ -780,6 +1149,26 @@ html, body{
     line-height:1.6;
 }
 
+.jd-paper-header,
+.jd-paper-body,
+.jd-profile-card,
+.jd-chip,
+.jd-section-block,
+.jd-card,
+.jd-title-wrap,
+.jd-section-heading,
+.jd-card-title,
+.jd-meta-table th,
+.jd-info-table th{
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+}
+
+.jd-avoid-break{
+    break-inside:avoid;
+    page-break-inside:avoid;
+}
+
 @media (max-width: 992px){
     .jd-page{
         padding:14px 0 30px;
@@ -814,6 +1203,74 @@ html, body{
     .jd-list{
         font-size:12px;
     }
+
+    .jd-approval-summary-main{
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+    .jd-approval-table,
+    .jd-approval-table tbody,
+    .jd-approval-table tr,
+    .jd-approval-table th,
+    .jd-approval-table td{
+        display:block;
+        width:100%;
+    }
+
+    .jd-approval-table th{
+        border-bottom:0;
+    }
+}
+
+/* ===== EXPORT/PDF/PRINT ROOT: sumber tunggal agar Print dan PDF sama persis ===== */
+.jd-export-root{
+    position:absolute;
+    left:-99999px;
+    top:0;
+    width:210mm;
+    background:#ffffff;
+    z-index:-1;
+}
+
+.jd-export-page{
+    width:210mm;
+    height:297mm;
+    min-height:297mm;
+    max-height:297mm;
+    background:#ffffff;
+    box-sizing:border-box;
+    overflow:hidden;
+    page-break-after:always;
+    break-after:page;
+    border:0;
+}
+
+.jd-export-page:last-child{
+    page-break-after:auto;
+    break-after:auto;
+}
+
+.jd-export-page .jd-paper-header{
+    width:100%;
+    flex:0 0 auto;
+}
+
+.jd-export-page .jd-export-body{
+    padding:7mm 12mm 9mm 12mm;
+    background:#ffffff;
+    box-sizing:border-box;
+}
+
+.jd-export-page .jd-export-body > .jd-export-item:first-child{
+    margin-top:0 !important;
+}
+
+.jd-export-page .jd-profile-card,
+.jd-export-page .jd-section-block,
+.jd-export-page .jd-footer-note{
+    break-inside:avoid !important;
+    page-break-inside:avoid !important;
 }
 
 @page{
@@ -821,125 +1278,313 @@ html, body{
     margin:0;
 }
 
-/* PRINT HARUS SAMA DENGAN SHOW */
 @media print{
-    html, body{
-        margin:0 !important;
-        padding:0 !important;
-        background:#ffffff !important;
-        font-family:"Inter", "Segoe UI", Arial, sans-serif !important;
-    }
-
-    .d-print-none,
-    .jd-action-bar,
-    .jd-top-actions{
-        display:none !important;
-    }
-
-    .jd-page{
-        background:#ffffff !important;
-        padding:0 !important;
-        margin:0 !important;
-    }
-
-    .jd-paper-a4{
+    html,
+    body{
         width:210mm !important;
-        min-height:297mm !important;
-        margin:0 auto !important;
+        min-width:210mm !important;
+        margin:0 !important;
+        padding:0 !important;
         background:#ffffff !important;
-        border:1px solid #d5dbd1 !important;
-        box-shadow:none !important;
         overflow:visible !important;
-    }
-
-    .jd-header-grid{
-        display:grid !important;
-        grid-template-columns:72px 1fr 72px !important;
-        gap:14px !important;
-        align-items:center !important;
-    }
-
-    .jd-grid-2{
-        display:grid !important;
-        grid-template-columns:1fr 1fr !important;
-        gap:12px !important;
-        padding:14px !important;
-    }
-
-    .jd-paper-header,
-    .jd-paper-body,
-    .jd-profile-card,
-    .jd-chip,
-    .jd-section-block,
-    .jd-card,
-    .jd-title-wrap,
-    .jd-section-heading,
-    .jd-card-title,
-    .jd-meta-table th,
-    .jd-info-table th{
+        font-family:"Inter", "Segoe UI", Arial, sans-serif !important;
         -webkit-print-color-adjust:exact !important;
         print-color-adjust:exact !important;
     }
 
-    .jd-profile-card,
-    .jd-section-block,
-    .jd-card{
-        break-inside:avoid !important;
-        page-break-inside:avoid !important;
+    body.jd-printing *{
+        visibility:hidden !important;
+    }
+
+    body.jd-printing #jabatan-export-root,
+    body.jd-printing #jabatan-export-root *{
+        visibility:visible !important;
+    }
+
+    body.jd-printing #jabatan-export-root{
+        display:block !important;
+        position:absolute !important;
+        left:0 !important;
+        top:0 !important;
+        width:210mm !important;
+        z-index:999999 !important;
+        background:#ffffff !important;
+    }
+
+    body.jd-printing .jd-export-page{
+        width:210mm !important;
+        height:297mm !important;
+        min-height:297mm !important;
+        max-height:297mm !important;
+        margin:0 !important;
+        box-shadow:none !important;
+        border:0 !important;
+        overflow:hidden !important;
+    }
+
+    body:not(.jd-printing) .d-print-none,
+    body:not(.jd-printing) .jd-action-bar,
+    body:not(.jd-printing) .jd-top-actions{
+        display:none !important;
+    }
+
+    body:not(.jd-printing) .jd-page{
+        background:#ffffff !important;
+        padding:0 !important;
+        margin:0 !important;
+    }
+
+    body:not(.jd-printing) .jd-paper-a4{
+        width:210mm !important;
+        min-height:297mm !important;
+        margin:0 !important;
+        background:#ffffff !important;
+        border:0 !important;
+        box-shadow:none !important;
+        overflow:visible !important;
     }
 }
 </style>
 
-@if(in_array($role, ['admin', 'hcm']) && !$jabatanNotFound)
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+@if(!$jabatanNotFound)
+    <script src="{{ asset('vendor/html2pdf/html2pdf.bundle.min.js') }}"></script>
     <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const downloadBtn = document.getElementById('downloadPdfBtn');
-        if (!downloadBtn) return;
+    (function () {
+        const A4_HEIGHT_MM = 297;
+        const MAX_REBUILD_ATTEMPTS = 2;
 
-        downloadBtn.addEventListener('click', function () {
-            const element = document.getElementById('jabatan-print-area');
-            const originalText = downloadBtn.innerHTML;
+        function mmToPx(mm) {
+            const probe = document.createElement('div');
+            probe.style.width = mm + 'mm';
+            probe.style.position = 'absolute';
+            probe.style.left = '-99999px';
+            document.body.appendChild(probe);
+            const px = probe.getBoundingClientRect().width;
+            probe.remove();
+            return px;
+        }
 
-            downloadBtn.disabled = true;
-            downloadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Menyiapkan PDF...';
+        function createExportPage(root, headerSource) {
+            const page = document.createElement('div');
+            page.className = 'jd-export-page';
 
-            const opt = {
-                margin: 0,
-                filename: 'jabatan-{{ $j->id_jabatan }}-{{ \Illuminate\Support\Str::slug($j->nama_jabatan ?? "jabatan") }}.pdf',
-                image: { type: 'jpeg', quality: 1 },
-                html2canvas: {
-                    scale: 2.2,
-                    useCORS: true,
-                    backgroundColor: '#ffffff',
-                    scrollY: 0
-                },
-                jsPDF: {
-                    unit: 'mm',
-                    format: 'a4',
-                    orientation: 'portrait'
-                },
-                pagebreak: {
-                    mode: ['css', 'legacy'],
-                    avoid: ['.jd-card', '.jd-section-keep', '.jd-profile-card']
+            const header = headerSource.cloneNode(true);
+            header.removeAttribute('data-export-header');
+
+            const body = document.createElement('div');
+            body.className = 'jd-export-body';
+
+            page.appendChild(header);
+            page.appendChild(body);
+            root.appendChild(page);
+
+            const pageHeight = mmToPx(A4_HEIGHT_MM);
+            const headerHeight = header.getBoundingClientRect().height;
+            const bodyStyle = window.getComputedStyle(body);
+            const bodyPaddingTop = parseFloat(bodyStyle.paddingTop) || 0;
+            const bodyPaddingBottom = parseFloat(bodyStyle.paddingBottom) || 0;
+            const availableHeight = pageHeight - headerHeight - bodyPaddingTop - bodyPaddingBottom;
+
+            return { page, body, availableHeight };
+        }
+
+        function getVisibleHeight(element) {
+            return Math.ceil(element.getBoundingClientRect().height);
+        }
+
+        function buildJabatanExportPages() {
+            const root = document.getElementById('jabatan-export-root');
+            const source = document.getElementById('jabatan-print-area');
+            const headerSource = source ? source.querySelector('[data-export-header="true"]') : null;
+            const contentSource = document.getElementById('jabatan-content-source');
+
+            if (!root || !source || !headerSource || !contentSource) {
+                return null;
+            }
+
+            root.innerHTML = '';
+            root.style.left = '-99999px';
+            root.style.top = '0';
+            root.style.zIndex = '-1';
+            root.style.visibility = 'hidden';
+
+            let current = createExportPage(root, headerSource);
+            let currentUsed = 0;
+            const items = Array.from(contentSource.children).filter(function (item) {
+                return item.nodeType === 1;
+            });
+
+            items.forEach(function (item) {
+                const clone = item.cloneNode(true);
+                clone.classList.add('jd-export-item');
+
+                const beforeHeight = current.body.scrollHeight;
+                current.body.appendChild(clone);
+                const afterHeight = current.body.scrollHeight;
+                const addedHeight = Math.max(getVisibleHeight(clone), afterHeight - beforeHeight);
+
+                const doesNotFit = current.body.scrollHeight > current.availableHeight;
+                const itemCanFitOnFreshPage = addedHeight <= current.availableHeight;
+                const pageAlreadyHasContent = currentUsed > 0;
+
+                if (doesNotFit && itemCanFitOnFreshPage && pageAlreadyHasContent) {
+                    clone.remove();
+                    current = createExportPage(root, headerSource);
+                    current.body.appendChild(clone);
+                    currentUsed = current.body.scrollHeight;
+                } else {
+                    currentUsed = current.body.scrollHeight;
                 }
-            };
+            });
 
-            html2pdf()
-                .set(opt)
-                .from(element)
-                .save()
-                .then(() => {
-                    downloadBtn.disabled = false;
-                    downloadBtn.innerHTML = originalText;
-                })
-                .catch(() => {
-                    downloadBtn.disabled = false;
-                    downloadBtn.innerHTML = originalText;
-                    alert('Gagal membuat PDF. Coba lagi.');
+            root.style.visibility = 'visible';
+            return root;
+        }
+
+        function cleanupExportAfterPrint() {
+            document.body.classList.remove('jd-printing');
+            const root = document.getElementById('jabatan-export-root');
+            if (root) {
+                root.style.left = '-99999px';
+                root.style.zIndex = '-1';
+                root.style.visibility = 'hidden';
+            }
+            window.removeEventListener('afterprint', cleanupExportAfterPrint);
+        }
+
+        window.printJabatanA4 = function () {
+            const root = buildJabatanExportPages();
+            if (!root) {
+                window.print();
+                return;
+            }
+
+            document.body.classList.add('jd-printing');
+            window.addEventListener('afterprint', cleanupExportAfterPrint);
+
+            setTimeout(function () {
+                window.print();
+            }, 180);
+        };
+
+        function ensureHtml2PdfLibrary() {
+            return new Promise(function (resolve, reject) {
+                if (window.html2pdf) {
+                    resolve();
+                    return;
+                }
+
+                const cdn = document.createElement('script');
+                cdn.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+                cdn.onload = function () {
+                    if (window.html2pdf) {
+                        resolve();
+                    } else {
+                        reject();
+                    }
+                };
+                cdn.onerror = reject;
+                document.head.appendChild(cdn);
+            });
+        }
+
+        function waitForImages(container) {
+            const images = Array.from(container.querySelectorAll('img'));
+            if (!images.length) {
+                return Promise.resolve();
+            }
+
+            return Promise.all(images.map(function (img) {
+                if (img.complete) {
+                    return Promise.resolve();
+                }
+
+                return new Promise(function (resolve) {
+                    img.onload = resolve;
+                    img.onerror = resolve;
                 });
+            }));
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const downloadBtn = document.getElementById('downloadPdfBtn');
+            if (!downloadBtn) return;
+
+            downloadBtn.addEventListener('click', function () {
+                const originalText = downloadBtn.innerHTML;
+                downloadBtn.disabled = true;
+                downloadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Menyiapkan PDF...';
+
+                ensureHtml2PdfLibrary()
+                    .then(function () {
+                        const root = buildJabatanExportPages();
+                        if (!root) {
+                            throw new Error('Area PDF tidak ditemukan.');
+                        }
+
+                        return waitForImages(root).then(function () {
+                            return root;
+                        });
+                    })
+                    .then(function (root) {
+                        root.style.left = '0';
+                        root.style.top = '0';
+                        root.style.zIndex = '-1';
+                        root.style.visibility = 'visible';
+
+                        const opt = {
+                            margin: 0,
+                            filename: 'jabatan-{{ $j->id_jabatan }}-{{ \Illuminate\Support\Str::slug($j->nama_jabatan ?? "jabatan") }}.pdf',
+                            image: { type: 'jpeg', quality: 1 },
+                            html2canvas: {
+                                scale: 2.2,
+                                useCORS: true,
+                                allowTaint: true,
+                                backgroundColor: '#ffffff',
+                                scrollX: 0,
+                                scrollY: 0,
+                                windowWidth: root.scrollWidth,
+                                windowHeight: root.scrollHeight
+                            },
+                            jsPDF: {
+                                unit: 'mm',
+                                format: 'a4',
+                                orientation: 'portrait',
+                                compress: true
+                            },
+                            pagebreak: {
+                                mode: ['css', 'legacy'],
+                                avoid: ['.jd-avoid-break', '.jd-export-item', '.jd-card']
+                            }
+                        };
+
+                        return html2pdf().set(opt).from(root).save();
+                    })
+                    .then(function () {
+                        const root = document.getElementById('jabatan-export-root');
+                        if (root) {
+                            root.style.left = '-99999px';
+                            root.style.zIndex = '-1';
+                            root.style.visibility = 'hidden';
+                        }
+                        downloadBtn.disabled = false;
+                        downloadBtn.innerHTML = originalText;
+                    })
+                    .catch(function (error) {
+                        const root = document.getElementById('jabatan-export-root');
+                        if (root) {
+                            root.style.left = '-99999px';
+                            root.style.zIndex = '-1';
+                            root.style.visibility = 'hidden';
+                        }
+                        downloadBtn.disabled = false;
+                        downloadBtn.innerHTML = originalText;
+                        alert('Gagal membuat PDF. Pastikan file public/vendor/html2pdf/html2pdf.bundle.min.js sudah ada, lalu refresh halaman.');
+                        console.error(error);
+                    });
+            });
         });
-    });
+    })();
     </script>
 @endif
 

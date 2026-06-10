@@ -4,21 +4,19 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Jabatan extends Model
+class JabatanVersion extends Model
 {
-    protected $table = 'tb_jabatan';
-    protected $primaryKey = 'id_jabatan';
+    protected $table = 'tb_jabatan_versions';
+    protected $primaryKey = 'id_jabatan_version';
 
     public $incrementing = true;
     protected $keyType = 'int';
+
     public $timestamps = false;
 
     protected $fillable = [
-        'active_version_id',
-        'draft_version_id',
-        'latest_version_number',
-        'jobdesk_updated_at',
-        'jobdesk_updated_by',
+        'id_jabatan',
+        'version_number',
 
         'nama_jabatan',
         'departemen',
@@ -30,24 +28,28 @@ class Jabatan extends Model
         'tujuan_jabatan',
         'tanggung_jawab',
         'tantangan_jabatan',
-
         'dim_keuangan',
         'dim_nonkeuangan',
         'bawahan_langsung',
-
         'internal_perusahaan',
         'external_perusahaan',
         'finansial',
         'non_finansial',
-
         'pengetahuan_keterampilan',
         'kompetensi',
         'syarat_kompetensi_jabatan',
 
-        'struktur_file',
+        'min_pendidikan',
+        'min_pengalaman',
+        'min_nilai',
 
-        'approval_status',
-        'approval_token',
+        'struktur_file',
+        'status',
+
+        'created_by',
+        'created_by_name',
+        'created_at',
+
         'approved_by',
         'approved_by_name',
         'approved_by_role',
@@ -55,6 +57,9 @@ class Jabatan extends Model
         'approved_by_departemen',
         'approved_at',
         'approval_catatan',
+
+        'effective_from',
+        'effective_until',
 
         'approval_flow_status',
         'proposed_approved_by',
@@ -71,60 +76,51 @@ class Jabatan extends Model
     ];
 
     protected $casts = [
+        'created_at' => 'datetime',
         'approved_at' => 'datetime',
-        'jobdesk_updated_at' => 'datetime',
+        'effective_from' => 'datetime',
+        'effective_until' => 'datetime',
         'proposed_approved_at' => 'datetime',
         'hcm_confirmed_at' => 'datetime',
     ];
 
     public function getRouteKeyName()
     {
-        return 'id_jabatan';
+        return 'id_jabatan_version';
     }
 
-    public function parent()
+    public function jabatan()
     {
-        return $this->belongsTo(self::class, 'parent_jabatan', 'id_jabatan');
+        return $this->belongsTo(Jabatan::class, 'id_jabatan', 'id_jabatan');
     }
 
-    public function children()
+    public function pegawaiAssignments()
     {
-        return $this->hasMany(self::class, 'parent_jabatan', 'id_jabatan');
+        return $this->hasMany(PegawaiJabatanVersion::class, 'id_jabatan_version', 'id_jabatan_version');
     }
 
-    public function pegawai()
+    public function getStatusLabelAttribute()
     {
-        return $this->hasMany(Pegawai::class, 'id_jabatan', 'id_jabatan');
+        return match ($this->status) {
+            'approved' => 'Approved',
+            'rejected' => 'Rejected',
+            'archived' => 'Archived',
+            'draft' => 'Draft',
+            'pending' => 'Pending Approval',
+            default => 'Pending Approval',
+        };
     }
 
-    public function approver()
+    public function getStatusBadgeAttribute()
     {
-        return $this->belongsTo(UserDaftar::class, 'approved_by', 'id');
-    }
-
-    public function versions()
-    {
-        return $this->hasMany(JabatanVersion::class, 'id_jabatan', 'id_jabatan');
-    }
-
-    public function activeVersion()
-    {
-        return $this->belongsTo(JabatanVersion::class, 'active_version_id', 'id_jabatan_version');
-    }
-
-    public function pendingVersion()
-    {
-        return $this->belongsTo(JabatanVersion::class, 'draft_version_id', 'id_jabatan_version');
-    }
-
-    public function draftVersion()
-    {
-        return $this->pendingVersion();
-    }
-
-    public function getOfficialVersionAttribute()
-    {
-        return $this->activeVersion ?: $this->pendingVersion;
+        return match ($this->status) {
+            'approved' => 'success',
+            'rejected' => 'danger',
+            'archived' => 'secondary',
+            'draft' => 'info',
+            'pending' => 'warning',
+            default => 'warning',
+        };
     }
 
     public function getTanggungJawabListAttribute()
@@ -160,26 +156,6 @@ class Jabatan extends Model
     public function getSyaratKompetensiJabatanListAttribute()
     {
         return $this->stringToArray($this->syarat_kompetensi_jabatan);
-    }
-
-    public function getApprovalStatusLabelAttribute()
-    {
-        return match ($this->approval_status) {
-            'approved' => 'Approved',
-            'rejected' => 'Rejected',
-            'pending' => 'Pending Approval',
-            default => 'Pending Approval',
-        };
-    }
-
-    public function getApprovalStatusBadgeAttribute()
-    {
-        return match ($this->approval_status) {
-            'approved' => 'success',
-            'rejected' => 'danger',
-            'pending' => 'warning',
-            default => 'warning',
-        };
     }
 
     private function stringToArray($value)

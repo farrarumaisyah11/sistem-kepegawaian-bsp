@@ -91,6 +91,27 @@ class Pegawai extends Model
         return $this->pengalamanLuarBsp();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Job Description Versioning
+    |--------------------------------------------------------------------------
+    | Menyimpan riwayat job description yang pernah diampu pegawai.
+    | currentJobdeskVersion = jobdesk aktif pegawai saat ini.
+    |--------------------------------------------------------------------------
+    */
+    public function jobdeskVersions()
+    {
+        return $this->hasMany(PegawaiJabatanVersion::class, 'nip', 'nip')
+            ->orderByDesc('assigned_at');
+    }
+
+    public function currentJobdeskVersion()
+    {
+        return $this->hasOne(PegawaiJabatanVersion::class, 'nip', 'nip')
+            ->where('is_current', 1)
+            ->latest('assigned_at');
+    }
+
     protected static function booted()
     {
         static::deleting(function ($pegawai) {
@@ -100,6 +121,17 @@ class Pegawai extends Model
             $pegawai->pengalamanLuarBsp()->delete();
             $pegawai->keluarga()->delete();
             $pegawai->penilaian()->delete();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Jobdesk Versioning
+            |--------------------------------------------------------------------------
+            | Riwayat jobdesk ikut dihapus ketika pegawai dihapus agar tidak menjadi
+            | orphan record. Jika perusahaan ingin arsip tetap tersimpan walaupun pegawai
+            | dihapus, bagian ini bisa diubah menjadi tidak menghapus.
+            |--------------------------------------------------------------------------
+            */
+            $pegawai->jobdeskVersions()->delete();
         });
     }
 }

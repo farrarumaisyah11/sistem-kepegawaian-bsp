@@ -31,23 +31,23 @@
         <div class="top-actions {{ $role === 'pegawai' ? 'pegawai-actions' : '' }}">
 
             @if($role !== 'pegawai')
-                <a href="{{ url()->previous() }}" class="btn btn-outline-secondary">
+                <a href="{{ url()->previous() }}" class="btn btn-outline-secondary hr-btn">
                     <i class="bi bi-arrow-left"></i> Kembali
                 </a>
             @endif
 
             <div class="d-flex gap-2 flex-wrap">
                 @if(in_array(auth()->user()->role, ['admin', 'hcm']))
-                    <a href="{{ route(auth()->user()->role.'.pegawai.edit', $pegawai->nip) }}" class="btn btn-warning text-dark">
+                    <a href="{{ route(auth()->user()->role.'.pegawai.edit', $pegawai->nip) }}" class="btn btn-warning text-dark hr-btn">
                         <i class="bi bi-pencil-square"></i> Edit Data
                     </a>
                 @endif
 
-                <button type="button" onclick="window.print()" class="btn btn-primary">
+                <button type="button" onclick="printPegawaiA4()" class="btn btn-primary hr-btn">
                     <i class="bi bi-printer"></i> Print
                 </button>
 
-                <button type="button" id="downloadPdfBtn" class="btn btn-success">
+                <button type="button" id="downloadPdfBtn" class="btn btn-success hr-btn">
                     <i class="bi bi-download"></i> Download PDF
                 </button>
             </div>
@@ -475,27 +475,28 @@
 
 <style>
 :root{
-    --hr-primary:#5f6b4b;
-    --hr-primary-dark:#47513a;
-    --hr-primary-soft:#eef3e7;
-    --hr-primary-soft-2:#f6f8f2;
-    --hr-border:#d8dfcf;
-    --hr-text:#1f2937;
-    --hr-muted:#6b7280;
-    --hr-bg:#ffffff;
+    --hr-primary:#59684a;
+    --hr-primary-dark:#3f4d35;
+    --hr-primary-soft:#e7eddc;
+    --hr-primary-soft-2:#f7f9f2;
+    --hr-border:#d7dfcc;
+    --hr-border-strong:#c5d0b8;
+    --hr-text:#101828;
+    --hr-muted:#667085;
+    --hr-label:#344054;
     --hr-white:#ffffff;
-    --hr-table-head:#f2f5ed;
-    --hr-label:#355070;
-    --hr-shadow:none;
 }
 
-/* WRAPPER UTAMA */
+html, body{
+    background:#f6f8f4 !important;
+}
+
 .hr-page{
     min-height:100vh;
-    font-family:"Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background:#f6f8f4;
+    font-family:"Inter", "Segoe UI", Arial, sans-serif;
     color:var(--hr-text);
-    padding-top:0 !important;
-    padding-bottom:0 !important;
+    padding:28px 0 50px !important;
 }
 
 .top-actions{
@@ -510,34 +511,41 @@
     justify-content:flex-end;
 }
 
-.paper-wrap{
-    padding:0 !important;
-    margin:0 !important;
+.hr-btn{
+    border-radius:10px;
+    font-weight:600;
+    padding:9px 16px;
 }
 
-/* KERTAS */
+.paper-wrap{
+    width:100%;
+    padding:0 !important;
+    margin:0 !important;
+    display:flex;
+    justify-content:center;
+}
+
 .paper-a4{
     width:210mm;
     min-height:297mm;
     margin:0 auto;
-    background:var(--hr-white) !important;
-    border:none !important;
-    border-radius:0 !important;
-    box-shadow:none !important;
+    background:var(--hr-white);
+    border:1px solid #dfe6d7;
+    border-radius:0;
+    box-shadow:0 14px 35px rgba(30, 41, 59, .08);
     overflow:hidden;
 }
 
-/* HEADER */
 .paper-header{
-    padding:8mm 12mm 4mm 12mm;
-    background:#ffffff !important;
-    border-bottom:1px solid var(--hr-border);
+    padding:10mm 12mm 5mm 12mm;
+    border-bottom:1px solid var(--hr-border-strong);
+    background:#ffffff;
 }
 
 .header-grid{
     display:grid;
-    grid-template-columns:54px 1fr 54px;
-    gap:8px;
+    grid-template-columns:72px 1fr 72px;
+    gap:14px;
     align-items:center;
 }
 
@@ -548,8 +556,8 @@
 }
 
 .logo-box img{
-    max-width:40px;
-    max-height:40px;
+    max-width:56px;
+    max-height:56px;
     object-fit:contain;
 }
 
@@ -558,80 +566,78 @@
 }
 
 .company-name{
-    font-size:14px;
+    font-size:17px;
     font-weight:800;
-    letter-spacing:.04em;
+    line-height:1.2;
+    letter-spacing:.03em;
     color:var(--hr-primary-dark);
     text-transform:uppercase;
-    line-height:1.2;
 }
 
 .company-unit{
-    margin-top:2px;
-    font-size:8px;
-    font-weight:700;
-    color:var(--hr-primary);
+    margin-top:4px;
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.07em;
+    color:#566447;
     text-transform:uppercase;
-    letter-spacing:.05em;
 }
 
 .company-address,
 .company-contact{
-    font-size:8px;
-    line-height:1.25;
-    margin-top:2px;
+    margin-top:4px;
+    font-size:9px;
+    line-height:1.4;
     color:#4b5563;
 }
 
 .doc-title-wrap{
-    margin-top:6px;
-    padding:7px 10px;
+    margin-top:12px;
     border:1px solid var(--hr-border);
     background:#ffffff;
-    border-radius:10px;
+    padding:12px 14px;
     text-align:center;
+    border-radius:12px;
 }
 
 .doc-title{
-    font-size:13px;
-    letter-spacing:.04em;
+    font-size:17px;
     font-weight:800;
+    line-height:1.2;
+    letter-spacing:.09em;
     color:var(--hr-primary-dark);
     text-transform:uppercase;
-    line-height:1.2;
 }
 
 .doc-subtitle{
-    font-size:8px;
-    margin-top:2px;
-    color:var(--hr-muted);
+    margin-top:4px;
+    font-size:10px;
     font-weight:600;
-    line-height:1.2;
+    color:var(--hr-muted);
 }
 
-/* BODY */
 .paper-body{
-    padding:4mm 10mm 8mm 10mm;
+    padding:6mm 12mm 9mm 12mm;
     background:#ffffff;
 }
 
-/* PROFIL */
 .profile-hero{
     display:grid;
-    grid-template-columns:120px 1fr;
+    grid-template-columns:118px 1fr;
     gap:16px;
-    padding:12px;
     align-items:center;
     border:1px solid var(--hr-border);
-    background:linear-gradient(135deg, #ffffff 0%, #fafcf8 100%);
     border-radius:18px;
+    padding:16px 18px;
+    margin-bottom:14px;
+    background:linear-gradient(180deg,#ffffff,#fbfcf8);
     page-break-inside:avoid;
     break-inside:avoid;
 }
 
 .profile-photo-box{
-    width:120px;
-    height:150px;
+    width:106px;
+    height:132px;
     border:1px solid var(--hr-border);
     border-radius:14px;
     overflow:hidden;
@@ -655,75 +661,81 @@
     justify-content:center;
     gap:6px;
     color:#94a3b8;
-    font-size:12px;
+    font-size:11px;
     text-align:center;
+    padding:8px;
 }
 
 .photo-placeholder i{
-    font-size:38px;
+    font-size:34px;
 }
 
 .profile-main{
     min-width:0;
-    padding-left:6px;
 }
 
 .identity-badge{
     display:inline-block;
-    padding:5px 10px;
+    padding:6px 14px;
     border-radius:999px;
     background:var(--hr-primary-soft);
-    color:var(--hr-primary-dark);
-    font-size:10px;
+    color:#324025;
+    font-size:11px;
     font-weight:800;
-    letter-spacing:.06em;
-    margin-bottom:8px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    margin-bottom:10px;
 }
 
 .pegawai-name{
-    margin:0 0 6px 0;
-    font-size:22px;
+    margin:0;
+    font-size:25px;
+    line-height:1.2;
     font-weight:800;
-    color:#111827;
-    line-height:1.15;
+    color:#0f172a;
     word-break:break-word;
 }
 
 .pegawai-meta{
-    margin-top:6px;
     display:flex;
     flex-wrap:wrap;
-    gap:6px 14px;
+    gap:12px 18px;
+    margin-top:10px;
     font-size:12px;
-    color:#374151;
-    line-height:1.4;
+    line-height:1.45;
+    color:#1f2937;
+}
+
+.pegawai-meta strong{
+    color:#0f172a;
 }
 
 .status-row{
-    margin-top:10px;
     display:flex;
     flex-wrap:wrap;
     gap:8px;
+    margin-top:12px;
 }
 
 .info-chip{
     display:inline-flex;
     align-items:center;
-    padding:5px 10px;
-    border-radius:999px;
-    background:#f8faf7;
+    padding:6px 12px;
     border:1px solid var(--hr-border);
-    color:var(--hr-primary-dark);
+    border-radius:999px;
+    background:#fbfcf8;
+    color:#344054;
     font-size:10px;
     font-weight:700;
     line-height:1.2;
+    max-width:100%;
+    word-break:break-word;
 }
 
-/* SECTION */
 .section-block{
-    margin-top:10px;
+    margin-top:12px;
     border:1px solid var(--hr-border);
-    border-radius:16px;
+    border-radius:14px;
     background:#ffffff;
     overflow:hidden;
 }
@@ -737,31 +749,31 @@
     display:flex;
     align-items:center;
     gap:8px;
-    padding:9px 12px;
-    background:linear-gradient(135deg, var(--hr-primary-soft) 0%, #dde6d1 100%);
-    color:var(--hr-primary-dark);
-    font-size:12px;
-    font-weight:800;
-    letter-spacing:.01em;
+    padding:11px 14px;
+    background:var(--hr-primary-soft);
     border-bottom:1px solid var(--hr-border);
-    line-height:1.2;
+    font-size:13px;
+    font-weight:800;
+    letter-spacing:.02em;
+    color:#27351e;
+    line-height:1.25;
 }
 
 .section-heading i{
-    font-size:12px;
+    font-size:14px;
+    color:#405031;
 }
 
-/* GRID INFO */
 .info-grid{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:12px;
-    padding:12px;
+    padding:14px;
 }
 
 .info-card{
     border:1px solid var(--hr-border);
-    border-radius:0;
+    border-radius:12px;
     overflow:hidden;
     background:#ffffff;
     page-break-inside:avoid;
@@ -769,13 +781,13 @@
 }
 
 .info-card-title{
-    padding:8px 10px;
+    padding:10px 12px;
     background:var(--hr-primary-soft-2);
-    color:var(--hr-primary-dark);
-    font-size:11px;
-    font-weight:800;
     border-bottom:1px solid var(--hr-border);
-    line-height:1.2;
+    color:#27351e;
+    font-size:12px;
+    font-weight:800;
+    line-height:1.25;
 }
 
 .info-table{
@@ -786,52 +798,67 @@
 
 .info-table th,
 .info-table td{
-    padding:8px 10px;
     border:1px solid var(--hr-border);
+    padding:9px 10px;
     vertical-align:top;
-    font-size:10px;
-    line-height:1.45;
+    font-size:11px;
+    line-height:1.5;
 }
 
 .info-table th{
-    width:38%;
-    background:#f3f4f2;
+    width:40%;
+    background:var(--hr-primary-soft-2);
     color:var(--hr-label);
-    font-weight:700;
+    font-weight:800;
     text-align:left;
 }
 
 .info-table td{
     background:#ffffff;
-    color:#1f2937;
+    color:#111827;
     font-weight:600;
     word-break:break-word;
+    overflow-wrap:anywhere;
 }
 
-/* TABLE RIWAYAT */
+.table-responsive{
+    width:100%;
+    overflow:visible !important;
+}
+
 .report-table{
     width:100%;
     border-collapse:collapse;
-    font-size:10px;
+    table-layout:fixed;
+    font-size:9px;
+}
+
+.report-table thead{
+    display:table-header-group;
 }
 
 .report-table thead th{
-    background:var(--hr-table-head);
-    color:var(--hr-primary-dark);
+    background:var(--hr-primary-soft-2);
+    color:#27351e;
     border:1px solid var(--hr-border);
-    padding:7px 6px;
+    padding:6px 5px;
     text-align:center;
     font-weight:800;
-    line-height:1.2;
+    line-height:1.25;
+    vertical-align:middle;
+    word-break:break-word;
+    overflow-wrap:anywhere;
 }
 
 .report-table tbody td{
     border:1px solid #e5e7eb;
-    padding:7px 6px;
+    padding:6px 5px;
     text-align:center;
     vertical-align:middle;
     color:#1f2937;
     line-height:1.35;
+    word-break:break-word;
+    overflow-wrap:anywhere;
 }
 
 .report-table tbody tr:nth-child(even){
@@ -843,8 +870,47 @@
     break-inside:avoid;
 }
 
+.report-table th:first-child,
+.report-table td:first-child{
+    width:8%;
+}
+
+/* ATURAN PAGE BREAK UNTUK PRINT/PDF
+   Kalau section/card tidak cukup di sisa halaman, pindahkan ke halaman berikutnya.
+   Baris tabel tetap dijaga supaya tidak terpotong di tengah. */
+.profile-hero,
+.section-block,
+.info-card,
+.empty-state,
+.document-footer{
+    page-break-inside:avoid;
+    break-inside:avoid;
+    break-inside:avoid-page;
+}
+
+.section-heading,
+.info-card-title,
+.report-table thead{
+    page-break-after:avoid;
+    break-after:avoid;
+    break-after:avoid-page;
+}
+
+.info-table tr,
+.report-table tr{
+    page-break-inside:avoid;
+    break-inside:avoid;
+    break-inside:avoid-page;
+}
+
+.info-table,
+.report-table{
+    page-break-inside:auto;
+    break-inside:auto;
+}
+
 .empty-state{
-    margin:12px;
+    margin:14px;
     border:1px dashed #cbd5e1;
     background:#fafafa;
     color:#6b7280;
@@ -852,27 +918,43 @@
     padding:12px;
     text-align:center;
     font-style:italic;
-    font-size:10px;
+    font-size:11px;
 }
 
 .document-footer{
     margin-top:16px;
-    padding-top:10px;
-    border-top:1px solid #e5e7eb;
+    padding-top:12px;
+    border-top:1px solid #d1d5db;
     text-align:center;
-    font-size:10px;
+    font-size:11px;
     color:#6b7280;
 }
 
-.table-responsive{
-    width:100%;
-    overflow-x:auto;
+.paper-header,
+.paper-body,
+.profile-hero,
+.info-chip,
+.section-block,
+.info-card,
+.doc-title-wrap,
+.section-heading,
+.info-card-title,
+.info-table th,
+.report-table thead th{
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
 }
 
-/* RESPONSIVE */
 @media (max-width: 992px){
+    .hr-page{
+        padding:14px 0 30px !important;
+    }
+
     .paper-a4{
         width:100%;
+        min-height:auto;
+        border-left:none;
+        border-right:none;
     }
 
     .header-grid{
@@ -886,10 +968,6 @@
         text-align:center;
     }
 
-    .profile-main{
-        padding-left:0;
-    }
-
     .pegawai-meta,
     .status-row{
         justify-content:center;
@@ -900,162 +978,240 @@
     }
 
     .info-table th,
-    .info-table td{
+    .info-table td,
+    .report-table thead th,
+    .report-table tbody td{
         font-size:12px;
     }
 }
 
-@media (max-width: 576px){
-    .paper-body{
-        padding:8px;
-    }
-
-    .paper-header{
-        padding:8px;
-    }
-
-    .company-name{
-        font-size:13px;
-    }
-
-    .doc-title{
-        font-size:12px;
-    }
-
-    .pegawai-name{
-        font-size:20px;
-    }
-
-    .info-table th{
-        width:40%;
-    }
-}
-
-/* PAGE */
 @page{
     size:A4 portrait;
-    margin:8mm;
+    margin:8mm 0 8mm 0;
 }
 
-/* PRINT */
+@page:first{
+    margin:0;
+}
+
+#pegawai-print-clone{
+    display:none;
+}
+
+
+/* Saat proses download PDF, aturan ini membantu html2pdf membaca page break dengan rapi */
+body.pdf-exporting .paper-a4,
+body.pdf-exporting .paper-body,
+body.pdf-exporting .section-block,
+body.pdf-exporting .info-card{
+    overflow:visible !important;
+}
+
+body.pdf-exporting .profile-hero,
+body.pdf-exporting .section-block,
+body.pdf-exporting .info-card,
+body.pdf-exporting .empty-state,
+body.pdf-exporting .document-footer{
+    page-break-inside:avoid !important;
+    break-inside:avoid !important;
+    break-inside:avoid-page !important;
+}
+
+body.pdf-exporting .section-heading,
+body.pdf-exporting .info-card-title,
+body.pdf-exporting .report-table thead{
+    page-break-after:avoid !important;
+    break-after:avoid !important;
+    break-after:avoid-page !important;
+}
+
+body.pdf-exporting .info-table tr,
+body.pdf-exporting .report-table tr{
+    page-break-inside:avoid !important;
+    break-inside:avoid !important;
+    break-inside:avoid-page !important;
+}
+
+/* Jarak aman atas-bawah halaman PDF agar section lanjutan tidak terlalu mepet tepi kertas */
+body.pdf-exporting .paper-a4{
+    padding-top:0 !important;
+    padding-bottom:0 !important;
+}
+
+
+/* PRINT: paksa hanya lembar A4 pegawai yang tampil, bukan layout/sidebar */
 @media print{
-    html, body{
-        width:210mm;
-        min-height:297mm;
+    html,
+    body{
+        width:210mm !important;
+        min-width:210mm !important;
         margin:0 !important;
         padding:0 !important;
         background:#ffffff !important;
+        overflow:visible !important;
+        font-family:"Inter", "Segoe UI", Arial, sans-serif !important;
+        -webkit-print-color-adjust:exact !important;
+        print-color-adjust:exact !important;
     }
 
     body *{
         visibility:hidden !important;
     }
 
-    .paper-a4,
-    .paper-a4 *{
-        visibility:visible !important;
-    }
-
-    .paper-a4{
-        position:absolute;
-        left:0;
-        top:0;
-        width:100%;
-        min-height:auto;
-        margin:0;
-        border:none !important;
-        border-radius:0 !important;
-        box-shadow:none !important;
-        overflow:visible !important;
-        background:#ffffff !important;
-    }
-
+    /* Sembunyikan semua elemen layout bawaan aplikasi/sidebar/header */
+    aside,
+    nav,
+    .sidebar,
+    .app-sidebar,
+    .main-sidebar,
+    .navbar,
+    .topbar,
+    .main-header,
+    .app-header,
+    .footer,
     .d-print-none,
     .top-actions{
         display:none !important;
+        visibility:hidden !important;
     }
 
+    /* Hilangkan pengaruh margin-left/padding dari layout utama */
+    #app,
+    .app,
+    .wrapper,
+    .app-wrapper,
+    .layout-wrapper,
+    .page-wrapper,
+    .content-wrapper,
+    .main-content,
+    .content,
+    .page-content,
+    main,
+    .container,
+    .container-fluid,
+    .container-xl,
     .hr-page,
-    .paper-wrap,
-    .paper-body,
-    .paper-header{
-        background:#ffffff !important;
-        padding-left:0 !important;
-        padding-right:0 !important;
+    .paper-wrap{
         margin:0 !important;
+        padding:0 !important;
+        width:100% !important;
+        max-width:none !important;
+        min-width:0 !important;
+        left:auto !important;
+        right:auto !important;
+        top:auto !important;
+        transform:none !important;
+        background:#ffffff !important;
+        box-shadow:none !important;
+    }
+
+    /* Fallback kalau user print dari shortcut/browser */
+    #pegawai-print-area,
+    #pegawai-print-area *{
+        visibility:visible !important;
+    }
+
+    #pegawai-print-area{
+        position:absolute !important;
+        left:0 !important;
+        top:0 !important;
+        right:auto !important;
+        width:210mm !important;
+        max-width:210mm !important;
+        min-height:297mm !important;
+        margin:0 !important;
+        background:#ffffff !important;
+        border:1px solid #d5dbd1 !important;
+        box-shadow:none !important;
+        overflow:visible !important;
+        z-index:999999 !important;
+    }
+
+    /* Mode tombol Print: gunakan clone langsung di body supaya tidak ikut sidebar */
+    body.pegawai-printing #pegawai-print-area,
+    body.pegawai-printing #pegawai-print-area *{
+        visibility:hidden !important;
+    }
+
+    body.pegawai-printing #pegawai-print-clone{
+        display:block !important;
+        visibility:visible !important;
+        position:absolute !important;
+        left:0 !important;
+        top:0 !important;
+        right:auto !important;
+        width:210mm !important;
+        max-width:210mm !important;
+        margin:0 !important;
+        padding:0 !important;
+        background:#ffffff !important;
+        z-index:9999999 !important;
+    }
+
+    body.pegawai-printing #pegawai-print-clone,
+    body.pegawai-printing #pegawai-print-clone *{
+        visibility:visible !important;
+    }
+
+    body.pegawai-printing #pegawai-print-clone .paper-a4{
+        position:static !important;
+        width:210mm !important;
+        max-width:210mm !important;
+        min-height:297mm !important;
+        margin:0 !important;
+        background:#ffffff !important;
+        border:1px solid #d5dbd1 !important;
+        box-shadow:none !important;
+        overflow:visible !important;
+    }
+
+    .paper-header{
+        padding:10mm 12mm 5mm 12mm !important;
+        border-bottom:1px solid var(--hr-border-strong) !important;
+        background:#ffffff !important;
+    }
+
+    .paper-body{
+        padding:6mm 12mm 9mm 12mm !important;
+        background:#ffffff !important;
     }
 
     .header-grid{
         display:grid !important;
-        grid-template-columns:54px 1fr 54px !important;
-        gap:8px !important;
+        grid-template-columns:72px 1fr 72px !important;
+        gap:14px !important;
         align-items:center !important;
     }
 
     .logo-box img{
-        max-width:40px !important;
-        max-height:40px !important;
+        max-width:56px !important;
+        max-height:56px !important;
     }
 
     .profile-hero{
         display:grid !important;
-        grid-template-columns:120px 1fr !important;
+        grid-template-columns:118px 1fr !important;
         gap:16px !important;
         align-items:center !important;
         text-align:left !important;
-        padding:12px !important;
     }
 
     .profile-photo-box{
-        width:120px !important;
-        height:150px !important;
+        width:106px !important;
+        height:132px !important;
         margin:0 !important;
     }
 
-    .profile-main{
-        min-width:0 !important;
-        padding-left:6px !important;
-    }
-
-    .identity-badge{
-        margin-bottom:8px !important;
-        font-size:10px !important;
-        padding:5px 10px !important;
-    }
-
-    .pegawai-name{
-        font-size:22px !important;
-        line-height:1.15 !important;
-        margin:0 0 6px 0 !important;
-    }
-
-    .pegawai-meta{
-        margin-top:6px !important;
-        display:flex !important;
-        flex-wrap:wrap !important;
-        gap:6px 14px !important;
-        font-size:12px !important;
-        justify-content:flex-start !important;
-    }
-
+    .pegawai-meta,
     .status-row{
-        margin-top:10px !important;
-        display:flex !important;
-        flex-wrap:wrap !important;
-        gap:8px !important;
         justify-content:flex-start !important;
-    }
-
-    .info-chip{
-        padding:5px 10px !important;
-        font-size:10px !important;
     }
 
     .info-grid{
         display:grid !important;
         grid-template-columns:1fr 1fr !important;
         gap:12px !important;
-        padding:12px !important;
+        padding:14px !important;
     }
 
     .table-responsive{
@@ -1064,37 +1220,109 @@
 
     .report-table{
         width:100% !important;
+        table-layout:fixed !important;
     }
 
     .report-table thead{
         display:table-header-group !important;
     }
 
+    .paper-a4,
+    .paper-body,
     .section-block,
+    .info-card{
+        overflow:visible !important;
+    }
+
     .profile-hero,
+    .section-block,
+    .section-keep,
     .info-card,
+    .empty-state,
+    .document-footer{
+        page-break-inside:avoid !important;
+        break-inside:avoid !important;
+        break-inside:avoid-page !important;
+    }
+
+    .section-heading,
+    .info-card-title,
+    .report-table thead{
+        page-break-after:avoid !important;
+        break-after:avoid !important;
+        break-after:avoid-page !important;
+    }
+
+    .info-table tr,
     .report-table tr{
         page-break-inside:avoid !important;
         break-inside:avoid !important;
+        break-inside:avoid-page !important;
     }
 
-    .section-heading{
-        background:#e8eee0 !important;
-        color:#2f3b22 !important;
-        -webkit-print-color-adjust:exact;
-        print-color-adjust:exact;
+    .info-table,
+    .report-table{
+        page-break-inside:auto !important;
+        break-inside:auto !important;
     }
 
+    .paper-header,
+    .paper-body,
+    .profile-hero,
+    .info-chip,
+    .section-block,
+    .info-card,
+    .doc-title-wrap,
+    .section-heading,
     .info-card-title,
-    .info-table th{
-        -webkit-print-color-adjust:exact;
-        print-color-adjust:exact;
+    .info-table th,
+    .report-table thead th{
+        -webkit-print-color-adjust:exact !important;
+        print-color-adjust:exact !important;
     }
 }
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
+function printPegawaiA4() {
+    const source = document.getElementById('pegawai-print-area');
+    if (!source) {
+        window.print();
+        return;
+    }
+
+    const oldClone = document.getElementById('pegawai-print-clone');
+    if (oldClone) {
+        oldClone.remove();
+    }
+
+    const cloneWrapper = document.createElement('div');
+    cloneWrapper.id = 'pegawai-print-clone';
+
+    const clonedPaper = source.cloneNode(true);
+    clonedPaper.id = 'pegawai-print-area-clone';
+
+    cloneWrapper.appendChild(clonedPaper);
+    document.body.appendChild(cloneWrapper);
+    document.body.classList.add('pegawai-printing');
+
+    const cleanupPrint = function () {
+        document.body.classList.remove('pegawai-printing');
+        const activeClone = document.getElementById('pegawai-print-clone');
+        if (activeClone) {
+            activeClone.remove();
+        }
+        window.removeEventListener('afterprint', cleanupPrint);
+    };
+
+    window.addEventListener('afterprint', cleanupPrint);
+
+    setTimeout(function () {
+        window.print();
+    }, 80);
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const downloadBtn = document.getElementById('downloadPdfBtn');
     if (!downloadBtn) return;
@@ -1107,12 +1335,16 @@ document.addEventListener('DOMContentLoaded', function () {
         downloadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Menyiapkan PDF...';
 
         const opt = {
-            margin: [6, 6, 6, 6],
+            // Top dan bottom margin dibuat agar halaman lanjutan tidak terlalu mepet ke atas/bawah.
+            // Kiri-kanan tetap 0 supaya lebar A4 tetap sama seperti tampilan show.
+            margin: [8, 0, 8, 0],
             filename: 'pegawai-{{ $pegawai->nip }}-{{ \Illuminate\Support\Str::slug($pegawai->nama ?? "pegawai") }}.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
+            image: { type: 'jpeg', quality: 1 },
             html2canvas: {
-                scale: 2,
+                scale: 2.2,
                 useCORS: true,
+                backgroundColor: '#ffffff',
+                scrollX: 0,
                 scrollY: 0
             },
             jsPDF: {
@@ -1122,18 +1354,29 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             pagebreak: {
                 mode: ['css', 'legacy'],
-                avoid: ['.info-card', '.report-table tr']
+                avoid: ['.profile-hero', '.section-block', '.info-card', '.empty-state', '.document-footer', '.report-table tr']
             }
         };
 
-        html2pdf().set(opt).from(element).save().then(() => {
-            downloadBtn.disabled = false;
-            downloadBtn.innerHTML = originalText;
-        }).catch(() => {
-            downloadBtn.disabled = false;
-            downloadBtn.innerHTML = originalText;
-            alert('Gagal membuat PDF. Coba lagi.');
-        });
+        document.body.classList.add('pdf-exporting');
+
+        setTimeout(function () {
+            html2pdf()
+                .set(opt)
+                .from(element)
+                .save()
+                .then(() => {
+                    document.body.classList.remove('pdf-exporting');
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = originalText;
+                })
+                .catch(() => {
+                    document.body.classList.remove('pdf-exporting');
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = originalText;
+                    alert('Gagal membuat PDF. Coba lagi.');
+                });
+        }, 120);
     });
 });
 </script>
