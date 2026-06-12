@@ -4,6 +4,7 @@
 @php
     $pegawaiPrefix = auth()->user()->role;
     $jabatans = $jabatans ?? collect();
+    $departemenList = $departemenList ?? collect();
 
     $formatDate = function ($value) {
         if (!$value) return '';
@@ -195,7 +196,8 @@
     <div class="row g-3">
         <div class="col-md-6">
             <label class="form-label">NIP <span class="text-danger">*</span></label>
-            <input type="number" class="form-control" value="{{ old('nip', $pegawai->nip) }}" disabled>
+            <input type="text" class="form-control" value="{{ old('nip', $pegawai->nip) }}" inputmode="numeric" disabled>
+            <small class="text-muted">NIP disimpan sebagai teks agar angka 0 di depan tetap aman.</small>
             <input type="hidden" name="nip" value="{{ old('nip', $pegawai->nip) }}">
         </div>
 
@@ -211,7 +213,7 @@
 
         <div class="col-md-6">
             <label class="form-label">Tanggal Lahir</label>
-            <input type="date" name="tgl_lahir" class="form-control" value="{{ old('tgl_lahir', $pegawai->tgl_lahir) }}">
+            <input type="date" name="tgl_lahir" class="form-control" value="{{ old('tgl_lahir', $formatDate($pegawai->tgl_lahir)) }}">
         </div>
 
         <div class="col-md-6">
@@ -250,24 +252,67 @@
 
         <div class="col-md-6">
             <label class="form-label">Golongan Jabatan</label>
-            <input type="number" name="gol_jabatan" class="form-control" min="7" max="20" value="{{ old('gol_jabatan', $pegawai->gol_jabatan) }}">
+            <input type="number" name="gol_jabatan" id="gol_jabatan" class="form-control" min="7" max="20" value="{{ old('gol_jabatan', $pegawai->gol_jabatan) }}">
         </div>
 
         <div class="col-md-6">
             <label class="form-label">TMT Golongan Jabatan</label>
-            <input type="date" name="tmt_gol_jabatan" class="form-control" value="{{ old('tmt_gol_jabatan', $pegawai->tmt_gol_jabatan) }}">
+            <input type="date" name="tmt_gol_jabatan" class="form-control" value="{{ old('tmt_gol_jabatan', $formatDate($pegawai->tmt_gol_jabatan)) }}">
         </div>
 
         <div class="col-md-6">
             <label class="form-label">TMT Golongan Upah</label>
-            <input type="date" name="tmt_gol_upah" class="form-control" value="{{ old('tmt_gol_upah', $pegawai->tmt_gol_upah) }}">
+            <input type="date" name="tmt_gol_upah" class="form-control" value="{{ old('tmt_gol_upah', $formatDate($pegawai->tmt_gol_upah)) }}">
         </div>
 
-        @include('pegawai.partials.jabatan-dropdown', [
-    'jabatans' => $jabatans,
-    'selectedDepartemen' => old('departemen', $pegawai->departemen ?? ''),
-    'selectedIdJabatan' => old('id_jabatan', $pegawai->id_jabatan ?? ''),
-])
+        @php
+            $selectedIdDepartemen = old('id_departemen', $pegawai->id_departemen ?? null);
+            $selectedIdJabatan = old('id_jabatan', $pegawai->id_jabatan ?? null);
+        @endphp
+
+        <div class="col-md-6">
+            <label class="form-label">Departemen</label>
+            <select name="id_departemen" id="id_departemen" class="form-control">
+                <option value="">Pilih Departemen</option>
+                @foreach($departemenList as $dep)
+                    <option value="{{ $dep->id_departemen }}"
+                        {{ (string) $selectedIdDepartemen === (string) $dep->id_departemen ? 'selected' : '' }}>
+                        {{ $dep->nama_departemen }}@if($dep->singkatan) ({{ $dep->singkatan }}) @endif
+                    </option>
+                @endforeach
+            </select>
+            <small class="form-text text-muted d-block mt-1">
+                Pilih departemen terlebih dahulu, kemudian daftar jabatan akan muncul sesuai departemen yang dipilih.
+            </small>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Jabatan</label>
+            <select name="id_jabatan" id="id_jabatan" class="form-control">
+                <option value="">Pilih departemen terlebih dahulu</option>
+                @foreach($jabatans as $jabatan)
+                    @php
+                        $namaDepartemen = $jabatan->departemenMaster->nama_departemen
+                            ?? $jabatan->departemen
+                            ?? '-';
+                    @endphp
+                    <option value="{{ $jabatan->id_jabatan }}"
+                        data-id-departemen="{{ $jabatan->id_departemen }}"
+                        data-departemen="{{ $namaDepartemen }}"
+                        data-gol-jabatan="{{ $jabatan->gol_jabatan }}"
+                        data-lokasi-kerja="{{ $jabatan->lokasi_kerja }}"
+                        {{ (string) $selectedIdJabatan === (string) $jabatan->id_jabatan ? 'selected' : '' }}>
+                        {{ $jabatan->nama_jabatan }}
+                    </option>
+                @endforeach
+            </select>
+            <small class="form-text text-muted d-block mt-1" id="jabatan_note">
+                Jabatan hanya akan ditampilkan setelah departemen dipilih.
+            </small>
+        </div>
+
+        <input type="hidden" name="departemen" id="departemen_text" value="{{ old('departemen', $pegawai->departemen ?? '') }}">
+        <input type="hidden" name="jabatan" id="jabatan_text" value="{{ old('jabatan', $pegawai->jabatan ?? '') }}">
 
         <div class="col-md-4">
             <label class="form-label">Hubungan Kerja</label>
@@ -282,7 +327,7 @@
         <div class="col-md-4">
             <label class="form-label">Lokasi Kerja</label>
             @php $lok = old('lokasi_kerja', $pegawai->lokasi_kerja); @endphp
-            <select name="lokasi_kerja" class="form-control">
+            <select name="lokasi_kerja" id="lokasi_kerja" class="form-control">
                 <option value="">Pilih</option>
                 <option value="Jakarta" {{ $lok == 'Jakarta' ? 'selected' : '' }}>Jakarta</option>
                 <option value="Pekanbaru" {{ $lok == 'Pekanbaru' ? 'selected' : '' }}>Pekanbaru</option>
@@ -306,7 +351,7 @@
 
         <div class="col-md-6">
             <label class="form-label">Tanggal Mulai Kerja</label>
-            <input type="date" name="tgl_masuk" class="form-control" value="{{ old('tgl_masuk', $pegawai->tgl_masuk) }}">
+            <input type="date" name="tgl_masuk" class="form-control" value="{{ old('tgl_masuk', $formatDate($pegawai->tgl_masuk)) }}">
         </div>
 
         <div class="col-md-6">
@@ -358,11 +403,11 @@
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label>Tanggal Mulai</label>
-                            <input type="date" name="pendidikan[{{ $i }}][pendidikan_mulai]" class="form-control" value="{{ $p['pendidikan_mulai'] ?? '' }}">
+                            <input type="date" name="pendidikan[{{ $i }}][pendidikan_mulai]" class="form-control" value="{{ $formatDate($p['pendidikan_mulai'] ?? '') }}">
                         </div>
                         <div class="col-md-6">
                             <label>Tanggal Selesai</label>
-                            <input type="date" name="pendidikan[{{ $i }}][pendidikan_selesai]" class="form-control" value="{{ $p['pendidikan_selesai'] ?? '' }}">
+                            <input type="date" name="pendidikan[{{ $i }}][pendidikan_selesai]" class="form-control" value="{{ $formatDate($p['pendidikan_selesai'] ?? '') }}">
                         </div>
                         <div class="col-md-6">
                             <label>Jenjang Pendidikan</label>
@@ -414,11 +459,11 @@
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label>Tanggal Mulai</label>
-                            <input type="date" name="kursus[{{ $i }}][tanggal_mulai_kursus]" class="form-control" value="{{ $k['tanggal_mulai_kursus'] ?? '' }}">
+                            <input type="date" name="kursus[{{ $i }}][tanggal_mulai_kursus]" class="form-control" value="{{ $formatDate($k['tanggal_mulai_kursus'] ?? '') }}">
                         </div>
                         <div class="col-md-6">
                             <label>Tanggal Selesai</label>
-                            <input type="date" name="kursus[{{ $i }}][tanggal_selesai_kursus]" class="form-control" value="{{ $k['tanggal_selesai_kursus'] ?? '' }}">
+                            <input type="date" name="kursus[{{ $i }}][tanggal_selesai_kursus]" class="form-control" value="{{ $formatDate($k['tanggal_selesai_kursus'] ?? '') }}">
                         </div>
                         <div class="col-md-6">
                             <label>Jenis Kursus</label>
@@ -430,11 +475,11 @@
                         </div>
                         <div class="col-md-6">
                             <label>Masa Berlaku Mulai</label>
-                            <input type="date" name="kursus[{{ $i }}][tanggal_mulai_berlaku]" class="form-control" value="{{ $k['tanggal_mulai_berlaku'] ?? '' }}">
+                            <input type="date" name="kursus[{{ $i }}][tanggal_mulai_berlaku]" class="form-control" value="{{ $formatDate($k['tanggal_mulai_berlaku'] ?? '') }}">
                         </div>
                         <div class="col-md-6">
                             <label>Masa Berlaku Selesai</label>
-                            <input type="date" name="kursus[{{ $i }}][tanggal_selesai_berlaku]" class="form-control" value="{{ $k['tanggal_selesai_berlaku'] ?? '' }}">
+                            <input type="date" name="kursus[{{ $i }}][tanggal_selesai_berlaku]" class="form-control" value="{{ $formatDate($k['tanggal_selesai_berlaku'] ?? '') }}">
                         </div>
                     </div>
                     <button type="button" class="btn btn-danger btn-sm mt-2 remove-item" {{ $i == 0 ? 'style=display:none;' : '' }}>Hapus</button>
@@ -462,11 +507,11 @@
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label>Tanggal Mulai</label>
-                            <input type="date" name="peng_bsp[{{ $i }}][pglmn_bsp_mulai]" class="form-control" value="{{ $b['pglmn_bsp_mulai'] ?? '' }}">
+                            <input type="date" name="peng_bsp[{{ $i }}][pglmn_bsp_mulai]" class="form-control" value="{{ $formatDate($b['pglmn_bsp_mulai'] ?? '') }}">
                         </div>
                         <div class="col-md-6">
                             <label>Tanggal Selesai</label>
-                            <input type="date" name="peng_bsp[{{ $i }}][pglmn_bsp_selesai]" class="form-control" value="{{ $b['pglmn_bsp_selesai'] ?? '' }}">
+                            <input type="date" name="peng_bsp[{{ $i }}][pglmn_bsp_selesai]" class="form-control" value="{{ $formatDate($b['pglmn_bsp_selesai'] ?? '') }}">
                         </div>
                         <div class="col-md-6">
                             <label>Jabatan</label>
@@ -502,11 +547,11 @@
                     <div class="row g-2">
                         <div class="col-md-6">
                             <label>Tanggal Mulai</label>
-                            <input type="date" name="peng_luar[{{ $i }}][pglmn_luar_bsp_mulai]" class="form-control" value="{{ $l['pglmn_luar_bsp_mulai'] ?? '' }}">
+                            <input type="date" name="peng_luar[{{ $i }}][pglmn_luar_bsp_mulai]" class="form-control" value="{{ $formatDate($l['pglmn_luar_bsp_mulai'] ?? '') }}">
                         </div>
                         <div class="col-md-6">
                             <label>Tanggal Selesai</label>
-                            <input type="date" name="peng_luar[{{ $i }}][pglmn_luar_bsp_selesai]" class="form-control" value="{{ $l['pglmn_luar_bsp_selesai'] ?? '' }}">
+                            <input type="date" name="peng_luar[{{ $i }}][pglmn_luar_bsp_selesai]" class="form-control" value="{{ $formatDate($l['pglmn_luar_bsp_selesai'] ?? '') }}">
                         </div>
                         <div class="col-md-6">
                             <label>Jabatan</label>
@@ -546,7 +591,7 @@
                         </div>
                         <div class="col-md-6">
                             <label>Tanggal Lahir</label>
-                            <input type="date" name="keluarga[{{ $i }}][tanggal_keluarga]" class="form-control" value="{{ $f['tanggal_keluarga'] ?? '' }}">
+                            <input type="date" name="keluarga[{{ $i }}][tanggal_keluarga]" class="form-control" value="{{ $formatDate($f['tanggal_keluarga'] ?? '') }}">
                         </div>
                         <div class="col-md-12">
                             <label class="form-label">Keterangan Keluarga</label>
@@ -950,6 +995,120 @@ function submitFormPegawai() {
         form.submit();
     }
 }
+
+
+document.addEventListener('DOMContentLoaded', function () {
+    const departemenSelect = document.getElementById('id_departemen');
+    const jabatanSelect = document.getElementById('id_jabatan');
+    const departemenText = document.getElementById('departemen_text');
+    const jabatanText = document.getElementById('jabatan_text');
+    const golJabatanInput = document.getElementById('gol_jabatan');
+    const lokasiKerjaInput = document.getElementById('lokasi_kerja');
+
+    if (!departemenSelect || !jabatanSelect) {
+        return;
+    }
+
+    function cleanDepartemenText(text) {
+        return (text || '')
+            .replace(/—/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function syncDepartemenText() {
+        if (!departemenText) return;
+
+        const selectedDep = departemenSelect.options[departemenSelect.selectedIndex];
+        departemenText.value = selectedDep && selectedDep.value
+            ? cleanDepartemenText(selectedDep.text)
+            : '';
+    }
+
+    function syncJabatanText() {
+        if (!jabatanText) return;
+
+        const selectedOption = jabatanSelect.options[jabatanSelect.selectedIndex];
+        jabatanText.value = selectedOption && selectedOption.value
+            ? (selectedOption.text || '').trim()
+            : '';
+    }
+
+    function filterJabatanByDepartemen() {
+        const selectedDepartemen = departemenSelect.value;
+        const placeholder = jabatanSelect.querySelector('option[value=""]');
+
+        if (placeholder) {
+            placeholder.textContent = selectedDepartemen ? 'Pilih Jabatan' : 'Pilih departemen terlebih dahulu';
+        }
+
+        jabatanSelect.disabled = !selectedDepartemen;
+
+        Array.from(jabatanSelect.options).forEach(function (option) {
+            if (!option.value) {
+                option.hidden = false;
+                return;
+            }
+
+            const optionDepartemen = option.dataset.idDepartemen || '';
+            option.hidden = !selectedDepartemen || optionDepartemen !== selectedDepartemen;
+        });
+
+        const selectedOption = jabatanSelect.options[jabatanSelect.selectedIndex];
+
+        if (!selectedDepartemen || (selectedOption && selectedOption.hidden)) {
+            jabatanSelect.value = '';
+            syncJabatanText();
+        }
+
+        syncDepartemenText();
+    }
+
+    function syncFromJabatan() {
+        const selectedOption = jabatanSelect.options[jabatanSelect.selectedIndex];
+
+        if (!selectedOption || !selectedOption.value) {
+            syncJabatanText();
+            return;
+        }
+
+        const idDepartemen = selectedOption.dataset.idDepartemen || '';
+        const namaDepartemen = selectedOption.dataset.departemen || '';
+        const golJabatan = selectedOption.dataset.golJabatan || '';
+        const lokasiKerja = selectedOption.dataset.lokasiKerja || '';
+
+        if (idDepartemen) {
+            departemenSelect.value = idDepartemen;
+        }
+
+        if (departemenText) {
+            departemenText.value = namaDepartemen;
+        }
+
+        syncJabatanText();
+
+        if (golJabatanInput && golJabatan) {
+            golJabatanInput.value = golJabatan;
+        }
+
+        if (lokasiKerjaInput && lokasiKerja) {
+            lokasiKerjaInput.value = lokasiKerja;
+        }
+
+        filterJabatanByDepartemen();
+    }
+
+    departemenSelect.addEventListener('change', function () {
+        filterJabatanByDepartemen();
+    });
+
+    jabatanSelect.addEventListener('change', function () {
+        syncFromJabatan();
+    });
+
+    filterJabatanByDepartemen();
+    syncFromJabatan();
+});
 </script>
 @endpush
 

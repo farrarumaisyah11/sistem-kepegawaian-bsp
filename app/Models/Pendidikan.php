@@ -8,6 +8,8 @@ class Pendidikan extends Model
 {
     protected $table = 'tb_pendidikan';
     protected $primaryKey = 'id_pendidikan';
+    public $incrementing = true;
+    protected $keyType = 'int';
     public $timestamps = false;
 
     protected $fillable = [
@@ -18,12 +20,13 @@ class Pendidikan extends Model
         'nama_institusi',
         'jurusan',
         'lokasi_pendidikan',
+
     ];
 
     protected $casts = [
-        'nip'                 => 'integer',
-        'pendidikan_mulai'    => 'date',
-        'pendidikan_selesai'  => 'date',
+        'nip' => 'string',
+        'pendidikan_mulai' => 'date',
+        'pendidikan_selesai' => 'date',
     ];
 
     public function pegawai()

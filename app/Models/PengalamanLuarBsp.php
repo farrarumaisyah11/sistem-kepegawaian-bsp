@@ -8,6 +8,8 @@ class PengalamanLuarBsp extends Model
 {
     protected $table = 'tb_pengalaman_luar_bsp';
     protected $primaryKey = 'id_pengalaman_luar_bsp';
+    public $incrementing = true;
+    protected $keyType = 'int';
     public $timestamps = false;
 
     protected $fillable = [
@@ -16,12 +18,13 @@ class PengalamanLuarBsp extends Model
         'pglmn_luar_bsp_selesai',
         'pengalaman_luar_jabatan',
         'pengalaman_luar_lokasi',
+
     ];
 
     protected $casts = [
-        'nip'                       => 'integer',
-        'pglmn_luar_bsp_mulai'      => 'date',
-        'pglmn_luar_bsp_selesai'    => 'date',
+        'nip' => 'string',
+        'pglmn_luar_bsp_mulai' => 'date',
+        'pglmn_luar_bsp_selesai' => 'date',
     ];
 
     public function pegawai()

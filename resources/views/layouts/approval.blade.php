@@ -25,9 +25,12 @@
             --apv-danger-bg:#fee4e2;
         }
 
-        *{ box-sizing:border-box; }
+        *{
+            box-sizing:border-box;
+        }
 
-        html, body{
+        html,
+        body{
             margin:0;
             padding:0;
             min-height:100%;
@@ -37,7 +40,9 @@
             line-height:1.5;
         }
 
-        a{ color:inherit; }
+        a{
+            color:inherit;
+        }
 
         .approval-shell{
             min-height:100vh;
@@ -46,46 +51,72 @@
             background:var(--apv-page);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | HEADER APPROVAL
+        |--------------------------------------------------------------------------
+        | Layout approval tidak memakai sidebar, jadi header mulai dari left: 0.
+        |--------------------------------------------------------------------------
+        */
         .approval-topbar{
+            height:64px;
             background:#ffffff;
-            border-bottom:1px solid var(--apv-border);
+            position:fixed;
+            top:0;
+            left:0;
+            right:0;
+            z-index:1000;
+            display:flex;
+            align-items:center;
+            box-shadow:0 2px 5px rgba(0,0,0,0.06);
+            border-bottom:1px solid rgba(215,223,204,.75);
         }
 
         .approval-topbar-inner{
-            width:min(1120px, calc(100% - 32px));
-            margin:0 auto;
-            padding:14px 0;
+            width:100%;
+            height:100%;
+            padding:0 24px;
             display:flex;
             justify-content:space-between;
             align-items:center;
             gap:16px;
         }
 
-        .approval-brand{
-            display:flex;
-            align-items:center;
-            gap:12px;
-            min-width:0;
-        }
+       .approval-brand{
+    display:flex;
+    align-items:center;
+    gap:0;
+    min-width:0;
+}
 
-        .approval-brand-mark{
-            width:40px;
-            height:40px;
-            border-radius:12px;
-            background:var(--apv-primary-soft);
-            border:1px solid var(--apv-border);
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            color:var(--apv-primary-dark);
-            font-weight:900;
-            letter-spacing:.04em;
-            flex:0 0 auto;
-        }
+.approval-brand-logo{
+    width:100px;
+    height:100px;
+    flex:0 0 100px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-right:-24px;
+}
 
+.approval-brand-logo img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+}
+
+.approval-brand-text{
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    line-height:1.15;
+    margin-left:0;
+}
         .approval-brand-title{
             font-size:14px;
-            font-weight:800;
+            font-weight:900;
             color:var(--apv-primary-dark);
             text-transform:uppercase;
             letter-spacing:.04em;
@@ -95,25 +126,80 @@
         }
 
         .approval-brand-subtitle{
-            font-size:12px;
+            font-size:11px;
             color:var(--apv-muted);
-            margin-top:2px;
+            margin-top:3px;
             white-space:nowrap;
             overflow:hidden;
             text-overflow:ellipsis;
+            font-weight:600;
         }
 
-        .approval-topbar-info{
-            color:var(--apv-muted);
-            font-size:12px;
+        .approval-user-info{
+            display:flex;
+            align-items:center;
+            gap:10px;
+            flex-shrink:0;
+        }
+
+        .approval-user-text{
             text-align:right;
-            white-space:nowrap;
         }
 
+        .approval-user-name{
+            margin:0;
+            font-size:12px;
+            line-height:1;
+            font-weight:800;
+            color:#111827;
+        }
+
+        .approval-user-role{
+            display:block;
+            margin-top:5px;
+            font-size:9px;
+            letter-spacing:.5px;
+            text-transform:uppercase;
+            font-weight:800;
+            color:#667085;
+        }
+
+        .avatar-header{
+            width:34px;
+            height:34px;
+            min-width:34px;
+            min-height:34px;
+            border-radius:50%;
+            background-color:#78845f;
+            font-size:12px;
+            overflow:hidden;
+            flex-shrink:0;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            color:#fff;
+            font-weight:bold;
+            box-shadow:0 2px 6px rgba(0,0,0,.12);
+        }
+
+        .avatar-header img{
+            width:100%;
+            height:100%;
+            object-fit:cover;
+            object-position:center;
+            display:block;
+            border-radius:50%;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN APPROVAL CONTENT
+        |--------------------------------------------------------------------------
+        */
         .approval-main{
             width:min(1120px, calc(100% - 32px));
             margin:0 auto;
-            padding:28px 0 44px;
+            padding:92px 0 44px;
             flex:1;
         }
 
@@ -422,17 +508,34 @@
         }
 
         @media(max-width: 768px){
-            .approval-topbar-inner,
-            .approval-main{
-                width:min(100% - 20px, 1120px);
+            .approval-topbar{
+                height:60px;
             }
 
             .approval-topbar-inner{
-                align-items:flex-start;
+                padding:0 14px;
             }
 
-            .approval-topbar-info{
+            .approval-brand-logo{
+                width:48px;
+                height:48px;
+            }
+
+            .approval-brand-title{
+                font-size:12px;
+            }
+
+            .approval-brand-subtitle{
+                font-size:10px;
+            }
+
+            .approval-user-text{
                 display:none;
+            }
+
+            .approval-main{
+                width:min(100% - 20px, 1120px);
+                padding-top:82px;
             }
 
             .approval-panel-head,
@@ -473,20 +576,150 @@
     @stack('styles')
 </head>
 <body>
+    @php
+        use App\Models\Pegawai;
+        use Illuminate\Support\Facades\Route;
+
+        $userLogin = auth()->user();
+
+        $fotoHeader = null;
+        $pegawaiLogin = null;
+
+        $roleLogin = data_get($userLogin, 'role') ?? session('role') ?? 'pegawai';
+
+        $namaHeader =
+            data_get($userLogin, 'name')
+            ?? data_get($userLogin, 'nama')
+            ?? data_get($userLogin, 'username')
+            ?? session('nama')
+            ?? session('name')
+            ?? 'Pengguna';
+
+        $roleHeader =
+            data_get($userLogin, 'role')
+            ?? session('role')
+            ?? 'Approval Access';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Khusus Role Pegawai
+        |--------------------------------------------------------------------------
+        */
+        if ($roleLogin === 'pegawai') {
+            $nipLogin =
+                data_get($userLogin, 'nip')
+                ?? data_get($userLogin, 'username')
+                ?? session('nip')
+                ?? session('login_nip')
+                ?? data_get(session('user'), 'nip')
+                ?? data_get(session('pegawai'), 'nip')
+                ?? null;
+
+            if ($nipLogin) {
+                $pegawaiLogin = Pegawai::where('nip', $nipLogin)->first();
+            }
+
+            if ($pegawaiLogin) {
+                $namaHeader = $pegawaiLogin->nama ?? $namaHeader;
+
+                $roleHeader =
+                    $pegawaiLogin->jabatan
+                    ?? data_get($userLogin, 'role')
+                    ?? session('role')
+                    ?? 'Pegawai';
+
+                if (!empty($pegawaiLogin->foto)) {
+                    $fotoDb = str_replace('\\', '/', $pegawaiLogin->foto);
+                    $fotoDb = ltrim($fotoDb, '/');
+
+                    $fotoDb = preg_replace('#^storage/#', '', $fotoDb);
+                    $fotoDb = preg_replace('#^public/#', '', $fotoDb);
+
+                    $namaFile = basename($fotoDb);
+
+                    $opsiFoto = [
+                        $fotoDb,
+                        'karyawan/' . $namaFile,
+                        'pengajuan/foto/' . $namaFile,
+                    ];
+
+                    foreach ($opsiFoto as $pathFoto) {
+                        $pathFoto = str_replace('\\', '/', $pathFoto);
+                        $pathFoto = ltrim($pathFoto, '/');
+
+                        $pathFoto = preg_replace('#^storage/#', '', $pathFoto);
+                        $pathFoto = preg_replace('#^public/#', '', $pathFoto);
+
+                        $storagePublicPath = storage_path('app/public/' . $pathFoto);
+                        $storageAppPath = storage_path('app/' . $pathFoto);
+                        $publicPath = public_path($pathFoto);
+
+                        if (file_exists($storagePublicPath) && is_file($storagePublicPath)) {
+                            if (Route::has('foto.pegawai')) {
+                                $fotoHeader = route('foto.pegawai', ['path' => $pathFoto]) . '?v=' . filemtime($storagePublicPath);
+                            } else {
+                                $fotoHeader = asset('storage/' . $pathFoto) . '?v=' . filemtime($storagePublicPath);
+                            }
+
+                            break;
+                        }
+
+                        if (file_exists($storageAppPath) && is_file($storageAppPath)) {
+                            if (Route::has('foto.pegawai')) {
+                                $fotoHeader = route('foto.pegawai', ['path' => $pathFoto]) . '?v=' . filemtime($storageAppPath);
+                            } else {
+                                $fotoHeader = asset('storage/' . $pathFoto) . '?v=' . filemtime($storageAppPath);
+                            }
+
+                            break;
+                        }
+
+                        if (file_exists($publicPath) && is_file($publicPath)) {
+                            if (Route::has('foto.pegawai')) {
+                                $fotoHeader = route('foto.pegawai', ['path' => $pathFoto]) . '?v=' . filemtime($publicPath);
+                            } else {
+                                $fotoHeader = asset($pathFoto) . '?v=' . filemtime($publicPath);
+                            }
+
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    @endphp
+
     <div class="approval-shell">
         <header class="approval-topbar">
             <div class="approval-topbar-inner">
                 <div class="approval-brand">
-                    <div class="approval-brand-mark">BSP</div>
-                    <div>
+                    <div class="approval-brand-logo">
+                        <img src="{{ asset('images/logo_bsp.webp') }}" alt="Logo BSP">
+                    </div>
+
+                    <div class="approval-brand-text">
                         <div class="approval-brand-title">PT. Bumi Siak Pusako</div>
-                        <div class="approval-brand-subtitle">Job Description Approval System</div>
                     </div>
                 </div>
 
-                <div class="approval-topbar-info">
-                    Sistem Informasi SDM<br>
-                    Approval Access
+                <div class="approval-user-info">
+                    <div class="approval-user-text">
+                        <p class="approval-user-name">
+                            {{ $namaHeader }}
+                        </p>
+
+                        <small class="approval-user-role">
+                            {{ $roleHeader }}
+                        </small>
+                    </div>
+
+                    <div class="avatar-header">
+                        @if ($roleLogin === 'pegawai' && $fotoHeader)
+                            <img src="{{ $fotoHeader }}" alt="Foto Pegawai">
+                        @else
+                            {{ strtoupper(substr($namaHeader ?? 'P', 0, 1)) }}
+                        @endif
+                    </div>
                 </div>
             </div>
         </header>

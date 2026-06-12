@@ -8,14 +8,20 @@ class Keluarga extends Model
 {
     protected $table = 'tb_keluarga';
     protected $primaryKey = 'id_keluarga';
+    public $incrementing = true;
+    protected $keyType = 'int';
     public $timestamps = false;
 
     protected $fillable = [
-        'nip','tanggal_keluarga','nama_keluarga','ket_keluarga',
+        'nip',
+        'tanggal_keluarga',
+        'nama_keluarga',
+        'ket_keluarga',
+
     ];
 
     protected $casts = [
-        'nip' => 'integer',
+        'nip' => 'string',
         'tanggal_keluarga' => 'date',
     ];
 

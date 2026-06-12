@@ -161,10 +161,6 @@
         font-weight:600;
     }
 
-    .hero-summary-value.compact{
-        font-size:42px;
-    }
-
     .chart-box{
         background:#fff;
         border:1px solid var(--border);
@@ -225,10 +221,6 @@
             font-size:44px;
         }
 
-        .hero-summary-value.compact{
-            font-size:36px;
-        }
-
         .chart-wrap-main{
             height:290px;
         }
@@ -256,16 +248,84 @@
 
 @section('content')
 @php
-    $dashboardStatsRoute = auth()->user()->role === 'admin'
+    $role = auth()->user()->role ?? null;
+
+    $dashboardStatsRoute = $role === 'admin'
         ? route('admin.dashboard.stats')
         : route('hcm.dashboard.stats');
+
+    $safeStaffProfesional = $staffProfesional ?? [
+        'Core' => 0,
+        'Subcore' => 0,
+        'Support' => 0,
+    ];
+
+    $safeLokasiKerja = $lokasiKerja ?? [
+        'Jakarta' => 0,
+        'Pekanbaru' => 0,
+        'Zamrud' => 0,
+        'Pedada' => 0,
+        'West Area' => 0,
+    ];
+
+    $dashboardInitialData = [
+        'totalPegawai' => (int) ($totalPegawai ?? 0),
+        'totalJabatan' => (int) ($totalJabatan ?? 0),
+        'jumlahDepartemen' => (int) ($jumlahDepartemen ?? 0),
+        'jumlahLokasiAktif' => (int) ($jumlahLokasiAktif ?? 0),
+
+        'hubunganKerjaDominan' => $hubunganKerjaDominan ?? '-',
+        'jumlahHubunganKerjaDominan' => (int) ($jumlahHubunganKerjaDominan ?? 0),
+
+        'pwt' => (int) ($pwt ?? 0),
+        'pwtt' => (int) ($pwtt ?? 0),
+
+        'manajerial' => (int) ($manajerial ?? 0),
+        'staffUtama' => (int) ($staffUtama ?? 0),
+        'staffMadya' => (int) ($staffMadya ?? 0),
+        'staffBiasa' => (int) ($staffBiasa ?? 0),
+
+        'profCore' => (int) ($profCore ?? ($safeStaffProfesional['Core'] ?? 0)),
+        'profSubcore' => (int) ($profSubcore ?? ($safeStaffProfesional['Subcore'] ?? 0)),
+        'profSupport' => (int) ($profSupport ?? ($safeStaffProfesional['Support'] ?? 0)),
+
+        'staffProfesional' => [
+            'Core' => (int) ($safeStaffProfesional['Core'] ?? 0),
+            'Subcore' => (int) ($safeStaffProfesional['Subcore'] ?? 0),
+            'Support' => (int) ($safeStaffProfesional['Support'] ?? 0),
+        ],
+
+        'statusPegawaiLabels' => $statusPegawaiLabels ?? [
+            'Manajerial',
+            'Staf Utama',
+            'Staf Madya',
+            'Staf Biasa',
+        ],
+
+        'statusPegawaiData' => $statusPegawaiData ?? [
+            (int) ($manajerial ?? 0),
+            (int) ($staffUtama ?? 0),
+            (int) ($staffMadya ?? 0),
+            (int) ($staffBiasa ?? 0),
+        ],
+
+        'lokasiKerja' => [
+            'Jakarta' => (int) ($safeLokasiKerja['Jakarta'] ?? 0),
+            'Pekanbaru' => (int) ($safeLokasiKerja['Pekanbaru'] ?? 0),
+            'Zamrud' => (int) ($safeLokasiKerja['Zamrud'] ?? 0),
+            'Pedada' => (int) ($safeLokasiKerja['Pedada'] ?? 0),
+            'West Area' => (int) ($safeLokasiKerja['West Area'] ?? 0),
+        ],
+    ];
 @endphp
 
 <div class="container-fluid px-0 dashboard-page">
     <div class="dashboard-head">
         <div>
             <h3 class="section-title">Dashboard</h3>
-            <p class="section-subtitle">Ringkasan data kepegawaian berdasarkan informasi yang sudah tersimpan di database.</p>
+            <p class="section-subtitle">
+                Ringkasan data kepegawaian berdasarkan informasi yang sudah tersimpan di database.
+            </p>
         </div>
 
         <div class="sync-badge">
@@ -274,7 +334,6 @@
         </div>
     </div>
 
-    {{-- HERO --}}
     <div class="hero-card">
         <div class="dashboard-hero-title">
             <h4>Informasi Utama Kepegawaian</h4>
@@ -313,7 +372,6 @@
         </div>
     </div>
 
-    {{-- DONUT CHART --}}
     <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="chart-box">
@@ -346,7 +404,6 @@
         </div>
     </div>
 
-    {{-- GRAFIK UTAMA --}}
     <div class="row g-4 mb-4">
         <div class="col-lg-6">
             <div class="chart-box">
@@ -386,6 +443,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const statsUrl = @json($dashboardStatsRoute);
+    const initialData = @json($dashboardInitialData);
 
     const softGreen  = '#6f7f59';
     const softGreen2 = '#87956f';
@@ -438,10 +496,16 @@ document.addEventListener('DOMContentLoaded', () => {
         id: 'doughnutLabelPlugin',
         afterDraw(chart) {
             const config = chart.config.options.plugins.centerText;
-            if (!config || !config.display) return;
+
+            if (!config || !config.display) {
+                return;
+            }
 
             const { ctx, chartArea } = chart;
-            if (!chartArea) return;
+
+            if (!chartArea) {
+                return;
+            }
 
             const x = (chartArea.left + chartArea.right) / 2;
             const y = (chartArea.top + chartArea.bottom) / 2;
@@ -456,7 +520,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ctx.fillStyle = '#1f2b16';
             ctx.font = '800 26px Segoe UI';
-            ctx.fillText(config.value || '', x, y + 14);
+            ctx.fillText(String(config.value ?? 0), x, y + 14);
+
             ctx.restore();
         }
     };
@@ -468,34 +533,59 @@ document.addEventListener('DOMContentLoaded', () => {
     let statusChart = null;
     let lokasiChart = null;
 
-    const initialData = {
-        totalPegawai: {{ $totalPegawai ?? 0 }},
-        totalJabatan: {{ $totalJabatan ?? 0 }},
-        jumlahDepartemen: {{ $jumlahDepartemen ?? 0 }},
-        jumlahLokasiAktif: {{ $jumlahLokasiAktif ?? 0 }},
-        hubunganKerjaDominan: @json($hubunganKerjaDominan ?? '-'),
-        jumlahHubunganKerjaDominan: {{ $jumlahHubunganKerjaDominan ?? 0 }},
-        pwt: {{ $pwt ?? 0 }},
-        pwtt: {{ $pwtt ?? 0 }},
-        manajerial: {{ $manajerial ?? 0 }},
-        staffUtama: {{ $staffUtama ?? 0 }},
-        staffMadya: {{ $staffMadya ?? 0 }},
-        staffBiasa: {{ $staffBiasa ?? 0 }},
-        staffProfesional: @json($staffProfesional ?? []),
-        statusPegawaiLabels: @json($statusPegawaiLabels ?? []),
-        statusPegawaiData: @json($statusPegawaiData ?? []),
-        lokasiKerja: @json($lokasiKerja ?? [])
-    };
+    function toNumber(value) {
+        const numberValue = Number(value);
+
+        return Number.isFinite(numberValue) ? numberValue : 0;
+    }
+
+    function getProfessionalCounts(data) {
+        const source = data.staffProfesional || {};
+
+        return {
+            Core: toNumber(source.Core ?? data.profCore ?? 0),
+            Subcore: toNumber(source.Subcore ?? data.profSubcore ?? 0),
+            Support: toNumber(source.Support ?? data.profSupport ?? 0)
+        };
+    }
+
+    function getProfessionalLabels() {
+        return ['Core', 'Subcore', 'Support'];
+    }
+
+    function getProfessionalValues(data) {
+        const counts = getProfessionalCounts(data);
+
+        return [
+            counts.Core,
+            counts.Subcore,
+            counts.Support
+        ];
+    }
+
+    function getProfessionalTotal(data) {
+        return getProfessionalValues(data).reduce((sum, value) => {
+            return sum + toNumber(value);
+        }, 0);
+    }
+
+    function getHubunganKerjaTotal(data) {
+        return toNumber(data.pwt) + toNumber(data.pwtt);
+    }
 
     function createCharts(data) {
         const hkEl = document.getElementById('hkChart');
+
         if (hkEl) {
             hkChart = new Chart(hkEl, {
                 type: 'doughnut',
                 data: {
                     labels: ['PWT', 'PWTT'],
                     datasets: [{
-                        data: [data.pwt || 0, data.pwtt || 0],
+                        data: [
+                            toNumber(data.pwt),
+                            toNumber(data.pwtt)
+                        ],
                         backgroundColor: [softRed, softGold],
                         borderWidth: 0,
                         hoverOffset: 6
@@ -520,8 +610,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         tooltip: commonTooltip,
                         centerText: {
                             display: true,
-                            label: 'Terisi',
-                            value: String((data.pwt || 0) + (data.pwtt || 0))
+                            label: 'Total Hubungan Kerja',
+                            value: String(getHubunganKerjaTotal(data))
                         }
                     }
                 }
@@ -529,13 +619,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const profEl = document.getElementById('profChart');
+
         if (profEl) {
             profChart = new Chart(profEl, {
                 type: 'doughnut',
                 data: {
-                    labels: Object.keys(data.staffProfesional || {}),
+                    labels: getProfessionalLabels(),
                     datasets: [{
-                        data: Object.values(data.staffProfesional || {}),
+                        data: getProfessionalValues(data),
                         backgroundColor: [softGreen2, softOlive, softGold],
                         borderWidth: 0,
                         hoverOffset: 6
@@ -559,20 +650,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         },
                         tooltip: commonTooltip,
                         centerText: {
-                        display: true,
-                        label: 'Profesional',
-                        value: String(
-                            (data.profCore || 0) +
-                            (data.profSubcore || 0) +
-                            (data.profSupport || 0)
-                        )
-                    }
+                            display: true,
+                            label: 'Total Profesional',
+                            value: String(getProfessionalTotal(data))
+                        }
                     }
                 }
             });
         }
 
         const statusEl = document.getElementById('statusChart');
+
         if (statusEl) {
             statusChart = new Chart(statusEl, {
                 type: 'bar',
@@ -592,6 +680,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const lokEl = document.getElementById('lokasiChart');
+
         if (lokEl) {
             lokasiChart = new Chart(lokEl, {
                 type: 'bar',
@@ -600,11 +689,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     datasets: [{
                         label: 'Jumlah Pegawai',
                         data: [
-                            data.lokasiKerja?.Jakarta ?? 0,
-                            data.lokasiKerja?.Pekanbaru ?? 0,
-                            data.lokasiKerja?.Zamrud ?? 0,
-                            data.lokasiKerja?.Pedada ?? 0,
-                            data.lokasiKerja?.['West Area'] ?? 0
+                            toNumber(data.lokasiKerja?.Jakarta),
+                            toNumber(data.lokasiKerja?.Pekanbaru),
+                            toNumber(data.lokasiKerja?.Zamrud),
+                            toNumber(data.lokasiKerja?.Pedada),
+                            toNumber(data.lokasiKerja?.['West Area'])
                         ],
                         backgroundColor: softGreen,
                         borderRadius: 0,
@@ -620,29 +709,33 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateText(data) {
         const setText = (id, value) => {
             const el = document.getElementById(id);
-            if (el) el.textContent = value;
+
+            if (el) {
+                el.textContent = toNumber(value);
+            }
         };
 
-        setText('totalPegawaiText', data.totalPegawai ?? 0);
-        setText('totalJabatanText', data.totalJabatan ?? 0);
-        setText('jumlahDepartemenText', data.jumlahDepartemen ?? 0);
+        setText('totalPegawaiText', data.totalPegawai);
+        setText('totalJabatanText', data.totalJabatan);
+        setText('jumlahDepartemenText', data.jumlahDepartemen);
     }
 
     function updateCharts(data) {
         if (hkChart) {
-            hkChart.data.datasets[0].data = [data.pwt ?? 0, data.pwtt ?? 0];
-            hkChart.options.plugins.centerText.value = String((data.pwt ?? 0) + (data.pwtt ?? 0));
+            hkChart.data.datasets[0].data = [
+                toNumber(data.pwt),
+                toNumber(data.pwtt)
+            ];
+
+            hkChart.options.plugins.centerText.value = String(getHubunganKerjaTotal(data));
             hkChart.update();
         }
 
         if (profChart) {
-            profChart.data.labels = Object.keys(data.staffProfesional || {});
-            profChart.data.datasets[0].data = Object.values(data.staffProfesional || {});
-profChart.options.plugins.centerText.value = String(
-    (data.profCore ?? 0) +
-    (data.profSubcore ?? 0) +
-    (data.profSupport ?? 0)
-);            profChart.update();
+            profChart.data.labels = getProfessionalLabels();
+            profChart.data.datasets[0].data = getProfessionalValues(data);
+            profChart.options.plugins.centerText.value = String(getProfessionalTotal(data));
+            profChart.update();
         }
 
         if (statusChart) {
@@ -653,12 +746,13 @@ profChart.options.plugins.centerText.value = String(
 
         if (lokasiChart) {
             lokasiChart.data.datasets[0].data = [
-                data.lokasiKerja?.Jakarta ?? 0,
-                data.lokasiKerja?.Pekanbaru ?? 0,
-                data.lokasiKerja?.Zamrud ?? 0,
-                data.lokasiKerja?.Pedada ?? 0,
-                data.lokasiKerja?.['West Area'] ?? 0
+                toNumber(data.lokasiKerja?.Jakarta),
+                toNumber(data.lokasiKerja?.Pekanbaru),
+                toNumber(data.lokasiKerja?.Zamrud),
+                toNumber(data.lokasiKerja?.Pedada),
+                toNumber(data.lokasiKerja?.['West Area'])
             ];
+
             lokasiChart.update();
         }
     }
@@ -673,9 +767,12 @@ profChart.options.plugins.centerText.value = String(
                 }
             });
 
-            if (!response.ok) return;
+            if (!response.ok) {
+                return;
+            }
 
             const data = await response.json();
+
             updateText(data);
             updateCharts(data);
         } catch (error) {

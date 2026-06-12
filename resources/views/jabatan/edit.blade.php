@@ -185,23 +185,46 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label">Departemen</label>
-                    <select name="departemen" class="form-control">
-                        <option value="">Pilih Departemen</option>
+    <label class="form-label">Departemen</label>
 
-                        @if($selectedDepartemen && !in_array($selectedDepartemen, $departemenOptions))
-                            <option value="{{ $selectedDepartemen }}" selected>
-                                {{ $selectedDepartemen }}
-                            </option>
-                        @endif
+    <select name="id_departemen" class="form-control">
+        <option value="">Pilih Departemen</option>
 
-                        @foreach ($departemenOptions as $departemen)
-                            <option value="{{ $departemen }}" {{ $selectedDepartemen == $departemen ? 'selected' : '' }}>
-                                {{ $departemen }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+        @foreach($departemenList as $dep)
+            <option value="{{ $dep->id_departemen }}"
+                {{ (string) old('id_departemen', $jabatan->id_departemen) === (string) $dep->id_departemen ? 'selected' : '' }}>
+                {{ str_repeat('— ', max(0, ($dep->level_departemen ?? 1) - 1)) }}
+                {{ $dep->nama_departemen }}
+                @if($dep->singkatan)
+                    ({{ $dep->singkatan }})
+                @endif
+            </option>
+        @endforeach
+    </select>
+</div>
+<div class="col-md-6">
+    <label class="form-label">Atasan Langsung / Parent Jabatan</label>
+
+    <select name="parent_jabatan" class="form-control">
+        <option value="">Root / Tidak Ada Atasan</option>
+
+        @foreach($parentOptions as $parent)
+            <option value="{{ $parent->id_jabatan }}"
+                {{ (string) old('parent_jabatan', $jabatan->parent_jabatan) === (string) $parent->id_jabatan ? 'selected' : '' }}>
+                {{ $parent->nama_jabatan }}
+                @if($parent->departemenMaster)
+                    - {{ $parent->departemenMaster->nama_departemen }}
+                @elseif($parent->departemen)
+                    - {{ $parent->departemen }}
+                @endif
+            </option>
+        @endforeach
+    </select>
+
+    <small class="text-muted">
+        Pilih jabatan atasan langsung agar struktur organisasi dapat terbentuk otomatis.
+    </small>
+</div>
 
                 <div class="col-md-4">
                     <label class="form-label">Golongan Jabatan</label>

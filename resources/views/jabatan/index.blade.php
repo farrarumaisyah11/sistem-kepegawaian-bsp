@@ -4,25 +4,27 @@
 
 @section('content')
 @php
-    $prefix = auth()->user()->role; // admin / hcm
-
-    $formatTanggalIndonesia = function ($date) {
-        if (!$date) {
-            return '-';
-        }
-
-        try {
-            return \Illuminate\Support\Carbon::parse($date)->locale('id')->translatedFormat('d F Y H:i');
-        } catch (\Throwable $e) {
-            return '-';
-        }
-    };
+    $prefix = auth()->user()->role;
 @endphp
 
 <div class="approval-page pt-2 pb-4">
 
     @if(session('success'))
         <div class="alert alert-success custom-alert d-none">{{ session('success') }}</div>
+    @endif
+
+    @if(session('success_auto'))
+        <div class="alert alert-success custom-alert d-none">{{ session('success_auto') }}</div>
+    @endif
+
+    @if(session('delete_error'))
+        <div class="alert alert-warning custom-alert d-none">
+            @if(is_array(session('delete_error')))
+                {{ implode(' ', session('delete_error')) }}
+            @else
+                {{ session('delete_error') }}
+            @endif
+        </div>
     @endif
 
     @if ($errors->any())
@@ -33,7 +35,7 @@
                 @endforeach
             </ul>
         </div>
-    @endif 
+    @endif
 
     <div class="page-header-card mb-4">
         <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
@@ -53,59 +55,51 @@
 
     <div class="card table-card">
         <div class="card-body">
-            <div class="table-responsive mt-3">
-                <table id="datatable" class="table table-bordered w-100 approval-table">
+            <div class="table-wrap mt-3">
+                <table id="datatable-jabatan" class="table table-bordered w-100 approval-table">
                     <thead>
                         <tr>
-                            <th>No</th>
-                            <th>Nama Jabatan</th>
-                            <th>Departemen</th>
-                            <th>Lokasi Kerja</th>
-                            <th>Home Base</th>
-                            <th>Terakhir Update</th>
-                            <th>Aksi</th>
+                            <th data-priority="1" class="col-no">No</th>
+                            <th data-priority="2" class="col-jabatan">Nama Jabatan</th>
+                            <th data-priority="3" class="col-departemen">Departemen</th>
+                            <th data-priority="5" class="col-lokasi">Lokasi Kerja</th>
+                            <th data-priority="6" class="col-home">Home Base</th>
+                            <th data-priority="4" class="col-aksi">Aksi</th>
                         </tr>
                     </thead>
 
                     <tbody>
                         @foreach($jabatans as $i => $jabatan)
                             @php
-                                $activeVersion = $jabatan->activeVersion ?? null;
-
-                                $lastUpdateSource = $activeVersion->approved_at
-                                    ?? $jabatan->jobdesk_updated_at
-                                    ?? $jabatan->approved_at
-                                    ?? null;
+                                $departemenNama = $jabatan->departemenMaster->nama_departemen
+                                    ?? $jabatan->departemen
+                                    ?? '-';
                             @endphp
 
                             <tr>
-                                <td class="text-center">{{ $i + 1 }}</td>
+                                <td class="text-center col-no">{{ $i + 1 }}</td>
 
-                                <td class="name-cell">
+                                <td class="name-cell col-jabatan">
                                     <a href="{{ route($prefix.'.jabatan.show', $jabatan->id_jabatan) }}" class="jabatan-link">
                                         {{ $jabatan->nama_jabatan ?? '-' }}
                                     </a>
                                 </td>
 
-                                <td class="text-center">
-                                    {{ $jabatan->departemen ?? '-' }}
+                                <td class="text-center col-departemen">
+                                    {{ $departemenNama }}
                                 </td>
 
-                                <td class="text-center">
+                                <td class="text-center col-lokasi">
                                     {{ $jabatan->lokasi_kerja ?? '-' }}
                                 </td>
 
-                                <td class="text-center">
+                                <td class="text-center col-home">
                                     <span class="soft-badge badge-pending">
                                         {{ $jabatan->home_base ?? '-' }}
                                     </span>
                                 </td>
 
-                                <td class="text-center">
-                                    {{ $formatTanggalIndonesia($lastUpdateSource) }}
-                                </td>
-
-                                <td class="text-center">
+                                <td class="text-center col-aksi">
                                     <div class="action-group">
                                         <a href="{{ route($prefix.'.jabatan.edit', $jabatan->id_jabatan) }}"
                                            class="icon-btn icon-edit"
@@ -151,7 +145,6 @@
                     </tbody>
                 </table>
             </div>
-
         </div>
     </div>
 </div>
@@ -164,16 +157,17 @@
 <style>
     .approval-page {
         width: 100%;
-        max-width: none;
+        max-width: 100%;
         padding-left: 0;
         padding-right: 0;
         margin-top: -20px;
+        overflow-x: hidden;
     }
 
     .page-header-card {
         background: #fbfcfa;
         border: 1px solid #eef1ec;
-        padding: 20px 25px;
+        padding: clamp(16px, 2vw, 25px);
     }
 
     .eyebrow {
@@ -186,7 +180,7 @@
 
     .page-title {
         color: #273957;
-        font-size: 32px;
+        font-size: clamp(24px, 3vw, 32px);
         font-weight: 700;
         letter-spacing: -.3px;
         margin-bottom: 8px;
@@ -194,7 +188,7 @@
 
     .page-subtitle {
         color: #6b7280;
-        font-size: 15px;
+        font-size: clamp(13px, 1.4vw, 15px);
         font-weight: 400;
     }
 
@@ -209,6 +203,7 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
+        white-space: nowrap;
     }
 
     .btn-add:hover {
@@ -219,13 +214,25 @@
     .table-card {
         border: 1px solid #edf0ea;
         border-radius: 0;
+        overflow: visible;
     }
 
     .table-card .card-body {
-        padding: 20px 22px;
+        padding: clamp(12px, 2vw, 22px);
+        overflow: visible;
+    }
+
+    .table-wrap {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+        overflow-y: visible;
     }
 
     .approval-table {
+        width: 100% !important;
+        max-width: 100% !important;
+        table-layout: fixed;
         border-color: #e8ece5 !important;
         margin-bottom: 0 !important;
     }
@@ -233,25 +240,54 @@
     .approval-table thead th {
         background: #6b775c;
         color: #fff;
-        font-size: 13px;
+        font-size: clamp(11px, 1vw, 13px);
         font-weight: 600;
-        padding: 15px 12px;
+        padding: clamp(9px, 1.3vw, 15px) clamp(6px, 1vw, 12px);
         text-align: center !important;
         border-color: rgba(255,255,255,.12) !important;
         vertical-align: middle;
-        white-space: nowrap;
+        white-space: normal;
+        line-height: 1.25;
     }
 
     .approval-table tbody td {
         color: #111827;
-        font-size: 13.5px;
-        padding: 15px 12px;
+        font-size: clamp(11.5px, 1vw, 13.5px);
+        padding: clamp(9px, 1.3vw, 15px) clamp(6px, 1vw, 12px);
         vertical-align: middle;
         border-color: #e8ece5 !important;
+        white-space: normal;
+        word-break: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.35;
     }
 
     .approval-table tbody tr:hover {
         background: #fbfcfa;
+    }
+
+    .col-no {
+        width: 5%;
+    }
+
+    .col-jabatan {
+        width: 28%;
+    }
+
+    .col-departemen {
+        width: 23%;
+    }
+
+    .col-lokasi {
+        width: 12%;
+    }
+
+    .col-home {
+        width: 11%;
+    }
+
+    .col-aksi {
+        width: 21%;
     }
 
     .name-cell {
@@ -263,6 +299,8 @@
         color: #273957;
         text-decoration: none;
         font-weight: 700;
+        display: inline;
+        line-height: 1.35;
     }
 
     .jabatan-link:hover {
@@ -274,12 +312,15 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 30px;
-        padding: 6px 12px;
+        min-height: 28px;
+        padding: 5px 10px;
         border-radius: 999px;
-        font-size: 12px;
+        font-size: clamp(10.5px, 1vw, 12px);
         font-weight: 600;
-        white-space: nowrap;
+        white-space: normal;
+        line-height: 1.2;
+        max-width: 100%;
+        text-align: center;
     }
 
     .badge-pending {
@@ -288,15 +329,18 @@
     }
 
     .action-group {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         justify-content: center;
-        gap: 10px;
+        gap: clamp(5px, .8vw, 10px);
+        flex-wrap: wrap;
+        max-width: 100%;
     }
 
     .icon-btn {
-        width: 38px;
-        height: 38px;
+        width: clamp(30px, 3vw, 38px);
+        height: clamp(30px, 3vw, 38px);
+        min-width: clamp(30px, 3vw, 38px);
         border-radius: 50%;
         border: none;
         display: inline-flex;
@@ -307,11 +351,12 @@
         cursor: pointer;
         line-height: 1;
         color: #fff !important;
+        padding: 0;
     }
 
     .action-icon {
-        width: 19px;
-        height: 19px;
+        width: clamp(15px, 1.5vw, 19px);
+        height: clamp(15px, 1.5vw, 19px);
         display: block;
         color: #fff;
     }
@@ -349,16 +394,45 @@
         border: none;
     }
 
-    .dataTables_wrapper .row:first-child {
+    .dataTables_wrapper {
+        width: 100%;
+        max-width: 100%;
+        position: relative;
+        z-index: 2;
+        overflow-x: hidden;
+    }
+
+    .dataTables_wrapper .row:first-child,
+    .dataTables_wrapper .row:last-child {
+        width: 100%;
+        max-width: 100%;
+        margin-left: 0;
+        margin-right: 0;
         align-items: center;
+    }
+
+    .dataTables_wrapper .row:first-child {
         margin-bottom: 14px;
+    }
+
+    .dataTables_wrapper .row:last-child {
+        margin-top: 18px;
+        position: relative;
+        z-index: 5;
+    }
+
+    .dataTables_length,
+    .dataTables_filter,
+    .dataTables_info,
+    .dataTables_paginate {
+        max-width: 100%;
     }
 
     .dataTables_length label,
     .dataTables_filter label,
     .dataTables_info {
         color: #6b7280;
-        font-size: 13px;
+        font-size: clamp(11.5px, 1vw, 13px);
         font-weight: 500;
     }
 
@@ -370,6 +444,10 @@
         outline: none;
     }
 
+    .dataTables_filter {
+        text-align: right;
+    }
+
     .dataTables_filter input {
         border: 1px solid #dfe5d8;
         border-radius: 14px;
@@ -377,7 +455,8 @@
         color: #374151;
         outline: none;
         margin-left: 8px;
-        min-width: 240px;
+        width: min(240px, 100%);
+        max-width: 100%;
     }
 
     .dataTables_filter input:focus,
@@ -385,12 +464,33 @@
         border-color: #6b775c;
     }
 
+    .dataTables_paginate {
+        position: relative;
+        z-index: 10;
+        pointer-events: auto;
+    }
+
+    .dataTables_paginate .pagination {
+        margin-bottom: 0;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .dataTables_paginate .page-item,
+    .dataTables_paginate .page-link {
+        pointer-events: auto;
+        cursor: pointer;
+    }
+
     .page-item .page-link {
         border: none;
         color: #59664b;
-        font-size: 13px;
+        font-size: clamp(11.5px, 1vw, 13px);
         border-radius: 10px;
         margin: 0 2px;
+        min-width: 32px;
+        text-align: center;
     }
 
     .page-item.active .page-link {
@@ -413,19 +513,114 @@
         opacity: .75;
     }
 
-    @media (max-width: 768px) {
-        .page-header-card {
-            padding: 22px 20px;
+    table.dataTable.dtr-inline.collapsed > tbody > tr > td.dtr-control:before,
+    table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control:before {
+        background-color: #6b775c;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+
+    @media (max-width: 1200px) {
+        .col-no {
+            width: 8%;
         }
 
-        .page-title {
-            font-size: 27px;
+        .col-jabatan {
+            width: 33%;
+        }
+
+        .col-departemen {
+            width: 25%;
+        }
+
+        .col-lokasi {
+            width: 12%;
+        }
+
+        .col-home {
+            width: 10%;
+        }
+
+        .col-aksi {
+            width: 12%;
+        }
+    }
+
+    @media (max-width: 992px) {
+        .approval-table {
+            table-layout: auto;
+        }
+
+        .table-wrap {
+            overflow-x: hidden;
+        }
+
+        .dataTables_filter {
+            text-align: left;
+            margin-top: 10px;
         }
 
         .dataTables_filter input {
-            min-width: 100%;
             margin-left: 0;
             margin-top: 6px;
+            width: 100%;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .page-header-card {
+            padding: 20px 16px;
+        }
+
+        .btn-add {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .dataTables_wrapper .row:first-child > div,
+        .dataTables_wrapper .row:last-child > div {
+            width: 100%;
+            text-align: left;
+            margin-bottom: 10px;
+        }
+
+        .dataTables_paginate .pagination {
+            justify-content: center;
+        }
+
+        .dataTables_info {
+            text-align: center;
+            display: block;
+        }
+
+        .approval-table tbody td {
+            font-size: 12px;
+        }
+
+        .action-group {
+            justify-content: flex-start;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .table-card .card-body {
+            padding: 12px;
+        }
+
+        .approval-table thead th,
+        .approval-table tbody td {
+            padding: 9px 7px;
+        }
+
+        .icon-btn {
+            width: 30px;
+            height: 30px;
+            min-width: 30px;
+        }
+
+        .action-icon {
+            width: 15px;
+            height: 15px;
         }
     }
 </style>
@@ -469,14 +664,61 @@
 </script>
 @endif
 
+@if(session('delete_error'))
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        $('#datatable').DataTable({
-            responsive: false,
-            scrollX: true,
+        const messages = @json(session('delete_error'));
+
+        Swal.fire({
+            icon: 'warning',
+            title: 'Jabatan Tidak Dapat Dihapus',
+            html: Array.isArray(messages)
+                ? messages.join('<br><br>')
+                : messages,
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#6b775c'
+        });
+    });
+</script>
+@endif
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const tableSelector = '#datatable-jabatan';
+
+        if ($.fn.DataTable.isDataTable(tableSelector)) {
+            $(tableSelector).DataTable().clear().destroy();
+        }
+
+        const table = $(tableSelector).DataTable({
+            paging: true,
             pageLength: 10,
-            lengthMenu: [5, 10, 25, 50, 100],
+            lengthMenu: [
+                [10, 25, 50, 100, -1],
+                [10, 25, 50, 100, "Semua"]
+            ],
+            searching: true,
+            ordering: true,
+            info: true,
+            autoWidth: false,
+            scrollX: false,
+            responsive: {
+                details: {
+                    type: 'inline',
+                    target: 'tr'
+                }
+            },
             order: [[0, 'asc']],
+            columnDefs: [
+                { orderable: false, targets: [5] },
+                { searchable: false, targets: [0, 5] },
+                { responsivePriority: 1, targets: 1 },
+                { responsivePriority: 2, targets: 5 },
+                { responsivePriority: 3, targets: 2 },
+                { responsivePriority: 4, targets: 0 },
+                { responsivePriority: 5, targets: 3 },
+                { responsivePriority: 6, targets: 4 }
+            ],
             language: {
                 search: "Cari:",
                 lengthMenu: "Tampilkan _MENU_ data",
@@ -491,11 +733,15 @@
                     next: "›",
                     previous: "‹"
                 }
-            },
-            columnDefs: [
-                { orderable: false, targets: [6] },
-                { searchable: false, targets: [0, 6] }
-            ]
+            }
+        });
+
+        setTimeout(function () {
+            table.columns.adjust().responsive.recalc();
+        }, 150);
+
+        window.addEventListener('resize', function () {
+            table.columns.adjust().responsive.recalc();
         });
 
         document.querySelectorAll('.delete-form').forEach(function (form) {

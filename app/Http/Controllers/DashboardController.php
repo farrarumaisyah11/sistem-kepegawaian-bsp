@@ -24,17 +24,37 @@ class DashboardController extends Controller
         $totalPegawai = Pegawai::count();
         $totalJabatan = Jabatan::count();
 
-        $pwt  = Pegawai::where('hubungan_kerja', 'PWT')->count();
-        $pwtt = Pegawai::where('hubungan_kerja', 'PWTT')->count();
+        /*
+        |--------------------------------------------------------------------------
+        | Hubungan Kerja
+        |--------------------------------------------------------------------------
+        | Menggunakan normalisasi TRIM + LOWER agar data tetap terbaca walaupun
+        | di database ada spasi, misalnya "PWT " atau " pwtt".
+        |--------------------------------------------------------------------------
+        */
+        $pwt  = $this->countByNormalizedColumn('hubungan_kerja', 'PWT');
+        $pwtt = $this->countByNormalizedColumn('hubungan_kerja', 'PWTT');
 
-        $manajerial = Pegawai::where('status', 'Manajerial')->count();
-        $staffUtama = Pegawai::where('status', 'Staf Utama')->count();
-        $staffMadya = Pegawai::where('status', 'Staf Madya')->count();
-        $staffBiasa = Pegawai::where('status', 'Staf Biasa')->count();
+        /*
+        |--------------------------------------------------------------------------
+        | Status Pegawai
+        |--------------------------------------------------------------------------
+        */
+        $manajerial = $this->countByNormalizedColumn('status', 'Manajerial');
+        $staffUtama = $this->countByNormalizedColumn('status', 'Staf Utama');
+        $staffMadya = $this->countByNormalizedColumn('status', 'Staf Madya');
+        $staffBiasa = $this->countByNormalizedColumn('status', 'Staf Biasa');
 
-        $profCore = Pegawai::where('profesional', 'Core')->count();
-        $profSubcore = Pegawai::where('profesional', 'Subcore')->count();
-        $profSupport = Pegawai::where('profesional', 'Support')->count();
+        /*
+        |--------------------------------------------------------------------------
+        | Profesional
+        |--------------------------------------------------------------------------
+        | Bagian ini dipakai oleh donut chart "Staf Profesional".
+        |--------------------------------------------------------------------------
+        */
+        $profCore    = $this->countByNormalizedColumn('profesional', 'Core');
+        $profSubcore = $this->countByNormalizedColumn('profesional', 'Subcore');
+        $profSupport = $this->countByNormalizedColumn('profesional', 'Support');
 
         $staffProfesional = [
             'Core'    => $profCore,
@@ -42,35 +62,64 @@ class DashboardController extends Controller
             'Support' => $profSupport,
         ];
 
+        /*
+        |--------------------------------------------------------------------------
+        | Lokasi Kerja
+        |--------------------------------------------------------------------------
+        */
         $lokasiKerja = [
-            'Jakarta'   => Pegawai::where('lokasi_kerja', 'Jakarta')->count(),
-            'Pekanbaru' => Pegawai::where('lokasi_kerja', 'Pekanbaru')->count(),
-            'Zamrud'    => Pegawai::where('lokasi_kerja', 'Zamrud')->count(),
-            'Pedada'    => Pegawai::where('lokasi_kerja', 'Pedada')->count(),
-            'West Area' => Pegawai::where('lokasi_kerja', 'West Area')->count(),
+            'Jakarta'   => $this->countByNormalizedColumn('lokasi_kerja', 'Jakarta'),
+            'Pekanbaru' => $this->countByNormalizedColumn('lokasi_kerja', 'Pekanbaru'),
+            'Zamrud'    => $this->countByNormalizedColumn('lokasi_kerja', 'Zamrud'),
+            'Pedada'    => $this->countByNormalizedColumn('lokasi_kerja', 'Pedada'),
+            'West Area' => $this->countByNormalizedColumn('lokasi_kerja', 'West Area'),
         ];
 
+        /*
+        |--------------------------------------------------------------------------
+        | Jumlah Departemen
+        |--------------------------------------------------------------------------
+        */
         $tableName = (new Pegawai())->getTable();
 
         if (Schema::hasColumn($tableName, 'departemen')) {
-            $jumlahDepartemen = Pegawai::whereNotNull('departemen')
-                ->where('departemen', '!=', '')
-                ->distinct()
-                ->count('departemen');
+            $jumlahDepartemen = (int) Pegawai::query()
+                ->whereNotNull('departemen')
+                ->whereRaw("TRIM(departemen) <> ''")
+                ->selectRaw("COUNT(DISTINCT TRIM(departemen)) AS total")
+                ->value('total');
         } else {
             $jumlahDepartemen = 0;
         }
 
         $jumlahLokasiAktif = collect($lokasiKerja)
-            ->filter(fn ($jumlah) => $jumlah > 0)
+            ->filter(fn ($jumlah) => (int) $jumlah > 0)
             ->count();
 
         $hubunganKerjaDominan = $pwt >= $pwtt ? 'PWT' : 'PWTT';
         $jumlahHubunganKerjaDominan = max($pwt, $pwtt);
 
-        $statusPegawaiLabels = ['Manajerial', 'Staf Utama', 'Staf Madya', 'Staf Biasa'];
-        $statusPegawaiData   = [$manajerial, $staffUtama, $staffMadya, $staffBiasa];
+        $statusPegawaiLabels = [
+            'Manajerial',
+            'Staf Utama',
+            'Staf Madya',
+            'Staf Biasa',
+        ];
 
+        $statusPegawaiData = [
+            $manajerial,
+            $staffUtama,
+            $staffMadya,
+            $staffBiasa,
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Trend Pegawai
+        |--------------------------------------------------------------------------
+        | Tetap dipertahankan walaupun di view saat ini belum ditampilkan.
+        |--------------------------------------------------------------------------
+        */
         $pegawaiTrendLabels = [];
         $pegawaiTrendData   = [];
 
@@ -79,32 +128,61 @@ class DashboardController extends Controller
 
             $pegawaiTrendLabels[] = $bulan->translatedFormat('M');
 
-            $pegawaiTrendData[] = Pegawai::whereDate('tgl_masuk', '<=', $bulan->copy()->endOfMonth())
+            $pegawaiTrendData[] = Pegawai::query()
+                ->whereNotNull('tgl_masuk')
+                ->whereDate('tgl_masuk', '<=', $bulan->copy()->endOfMonth()->toDateString())
                 ->count();
         }
 
         return [
-            'totalPegawai'                => $totalPegawai,
-            'totalJabatan'                => $totalJabatan,
-            'pwt'                         => $pwt,
-            'pwtt'                        => $pwtt,
-            'manajerial'                  => $manajerial,
-            'staffUtama'                  => $staffUtama,
-            'staffMadya'                  => $staffMadya,
-            'staffBiasa'                  => $staffBiasa,
-            'profCore'                    => $profCore,
-            'profSubcore'                 => $profSubcore,
-            'profSupport'                 => $profSupport,
-            'staffProfesional'            => $staffProfesional,
-            'lokasiKerja'                 => $lokasiKerja,
-            'jumlahDepartemen'            => $jumlahDepartemen,
-            'jumlahLokasiAktif'           => $jumlahLokasiAktif,
-            'hubunganKerjaDominan'        => $hubunganKerjaDominan,
-            'jumlahHubunganKerjaDominan'  => $jumlahHubunganKerjaDominan,
-            'statusPegawaiLabels'         => $statusPegawaiLabels,
-            'statusPegawaiData'           => $statusPegawaiData,
-            'pegawaiTrendLabels'          => $pegawaiTrendLabels,
-            'pegawaiTrendData'            => $pegawaiTrendData,
+            'totalPegawai'               => $totalPegawai,
+            'totalJabatan'               => $totalJabatan,
+
+            'pwt'                        => $pwt,
+            'pwtt'                       => $pwtt,
+
+            'manajerial'                 => $manajerial,
+            'staffUtama'                 => $staffUtama,
+            'staffMadya'                 => $staffMadya,
+            'staffBiasa'                 => $staffBiasa,
+
+            'profCore'                   => $profCore,
+            'profSubcore'                => $profSubcore,
+            'profSupport'                => $profSupport,
+            'staffProfesional'           => $staffProfesional,
+
+            'lokasiKerja'                => $lokasiKerja,
+
+            'jumlahDepartemen'           => $jumlahDepartemen,
+            'jumlahLokasiAktif'          => $jumlahLokasiAktif,
+            'hubunganKerjaDominan'       => $hubunganKerjaDominan,
+            'jumlahHubunganKerjaDominan' => $jumlahHubunganKerjaDominan,
+
+            'statusPegawaiLabels'        => $statusPegawaiLabels,
+            'statusPegawaiData'          => $statusPegawaiData,
+
+            'pegawaiTrendLabels'         => $pegawaiTrendLabels,
+            'pegawaiTrendData'           => $pegawaiTrendData,
         ];
+    }
+
+    private function countByNormalizedColumn(string $column, string $value): int
+    {
+        $allowedColumns = [
+            'hubungan_kerja',
+            'status',
+            'profesional',
+            'lokasi_kerja',
+        ];
+
+        if (!in_array($column, $allowedColumns, true)) {
+            return 0;
+        }
+
+        return Pegawai::query()
+            ->whereRaw("LOWER(TRIM(COALESCE({$column}, ''))) = ?", [
+                strtolower($value),
+            ])
+            ->count();
     }
 }

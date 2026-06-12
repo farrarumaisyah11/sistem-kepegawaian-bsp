@@ -14,6 +14,14 @@
     </div>
 @endif
 
+@if(session('success_auto'))
+    <div class="container-xl d-print-none mt-3">
+        <div class="alert alert-success rounded-4 shadow-sm">
+            {{ session('success_auto') }}
+        </div>
+    </div>
+@endif
+
 @php
     $prefix = auth()->user()->role;
     $role = auth()->user()->role;
@@ -70,22 +78,34 @@
     |--------------------------------------------------------------------------
     */
     $approvalStatus = $j->approval_status ?? 'pending';
+    $approvalFlowStatus = $j->approval_flow_status ?? 'pending';
 
-    $approvalStatusText = match ($approvalStatus) {
-        'approved' => 'Approved',
-        'rejected' => 'Rejected',
-        'pending' => 'Pending Approval',
-        default => 'Pending Approval',
-    };
+    $isFinalApproval = $j->is_approval_final ?? false;
+    $isWaitingHcmFinal = $j->is_waiting_hcm_final ?? false;
 
-    $approvalStatusClass = match ($approvalStatus) {
-        'approved' => 'approved',
-        'rejected' => 'rejected',
-        'pending' => 'pending',
-        default => 'pending',
-    };
+    if ($isFinalApproval) {
+        $approvalStatusText = 'Approved Final';
+        $approvalStatusClass = 'approved';
+    } elseif ($isWaitingHcmFinal) {
+        $approvalStatusText = 'Menunggu Approval Final HCM';
+        $approvalStatusClass = 'pending';
+    } else {
+        $approvalStatusText = match ($approvalStatus) {
+            'approved' => 'Approved',
+            'rejected' => 'Rejected',
+            'pending' => 'Pending Approval',
+            default => 'Pending Approval',
+        };
 
-    $isApproved = $approvalStatus === 'approved';
+        $approvalStatusClass = match ($approvalStatus) {
+            'approved' => 'approved',
+            'rejected' => 'rejected',
+            'pending' => 'pending',
+            default => 'pending',
+        };
+    }
+
+    $isApproved = $isFinalApproval || $approvalStatus === 'approved';
 
     $approvalDate = '-';
     if (!empty($j->approved_at)) {
@@ -98,39 +118,208 @@
         }
     }
 
-    $approvedByName = $j->approved_by_name ?? '-';
-    $approvedByRole = !empty($j->approved_by_role) ? strtoupper($j->approved_by_role) : '-';
-    $approvedByJabatan = $j->approved_by_jabatan ?? '-';
-    $approvedByDepartemen = $j->approved_by_departemen ?? '-';
-    $approvalCatatan = $j->approval_catatan ?? '-';
+    $hcmFinalDate = '-';
+    if (!empty($j->hcm_confirmed_at)) {
+        try {
+            $hcmFinalDate = \Illuminate\Support\Carbon::parse($j->hcm_confirmed_at)
+                ->locale('id')
+                ->translatedFormat('d F Y H:i');
+        } catch (\Throwable $e) {
+            $hcmFinalDate = $j->hcm_confirmed_at;
+        }
+    }
+
+    $approvedByName = $j->approved_by_name ?? $j->proposed_approved_by_name ?? '-';
+    $approvedByRole = !empty($j->approved_by_role ?? $j->proposed_approved_by_role) ? strtoupper($j->approved_by_role ?? $j->proposed_approved_by_role) : '-';
+    $approvedByJabatan = $j->approved_by_jabatan ?? $j->proposed_approved_by_jabatan ?? '-';
+    $approvedByDepartemen = $j->approved_by_departemen ?? $j->proposed_approved_by_departemen ?? '-';
+    $approvalCatatan = $j->approval_catatan ?? $j->proposed_approval_catatan ?? '-';
+
+
+    $formatTanggalApprovalLog = function ($date) {
+        if (!$date) return '-';
+        try {
+            return \Illuminate\Support\Carbon::parse($date)->locale('id')->translatedFormat('d F Y H:i');
+        } catch (\Throwable $e) {
+            return $date;
+        }
+    };
+
+    $approvalLogs = $j->relationLoaded('approvalLogs')
+        ? $j->approvalLogs->where('id_jabatan', $j->id_jabatan)->values()
+        : collect();
+
+    $approvalLogs = $approvalLogs->take(50);
+
+    $pendingVersionLabel = $j->pendingVersion
+        ? 'Versi '.$j->pendingVersion->version_number
+        : '-';
+
+    $activeVersionLabel = $j->activeVersion
+        ? 'Versi '.$j->activeVersion->version_number
+        : '-';
 @endphp
 
 <div class="jd-page">
 
-    {{-- ACTION BAR HANYA UNTUK ADMIN / HCM --}}
+    {{-- CORPORATE ACTION AREA HANYA UNTUK ADMIN / HCM --}}
     @if(in_array($role, ['admin', 'hcm']) && !$jabatanNotFound)
-        <div class="container-xl d-print-none jd-action-bar">
-            <div class="jd-top-actions">
-                <a href="{{ url()->previous() }}" class="btn btn-outline-secondary jd-btn">
-                    <i class="bi bi-arrow-left"></i> Kembali
-                </a>
+        @php
+            $canShowApprovalLink = (bool) ($j->can_approval_link_action ?? false);
+            $canFinalApprove = $role === 'hcm' && (bool) ($j->can_hcm_final_approve_from_show ?? false);
+            $canApplyJobdesc = in_array($role, ['admin', 'hcm'], true) && (bool) ($j->can_apply_approved_version ?? false);
+        @endphp
 
-                <div class="d-flex gap-2 flex-wrap">
-                    <a href="{{ route($prefix.'.jabatan.edit', $j->id_jabatan) }}" class="btn btn-warning text-dark jd-btn">
-                        <i class="bi bi-pencil-square"></i> Edit Data
+        <div class="container-xl d-print-none jd-corporate-panel">
+            <div class="jd-command-card">
+                <div class="jd-command-left">
+                    <a href="{{ route($prefix.'.jabatan.index') }}" class="btn btn-light jd-btn jd-btn-muted">
+                        <i class="bi bi-arrow-left"></i>
+                        <span>Kembali</span>
                     </a>
 
-                    <a href="{{ route('jabatan.approval.page', $j->id_jabatan) }}" class="btn btn-outline-success jd-btn">
-                        <i class="bi bi-shield-check"></i> Approval
+                    <div class="jd-command-title">
+                        <div class="jd-command-eyebrow">Detail Jabatan</div>
+                        <div class="jd-command-name">{{ $j->nama_jabatan ?? '-' }}</div>
+                        <div class="jd-command-meta">
+                            {{ $j->departemen ?? '-' }} · Active {{ $activeVersionLabel }} · Pending {{ $pendingVersionLabel }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="jd-command-right">
+                    <a href="{{ route($prefix.'.jabatan.edit', $j->id_jabatan) }}"
+                       class="btn btn-warning text-dark jd-btn">
+                        <i class="bi bi-pencil-square"></i>
+                        <span>Edit</span>
                     </a>
 
-                    <button type="button" onclick="printJabatanA4()" class="btn btn-primary jd-btn">
-                        <i class="bi bi-printer"></i> Print
+                    <button type="button" onclick="printJabatanA4()" class="btn btn-outline-primary jd-btn">
+                        <i class="bi bi-printer"></i>
+                        <span>Print A4</span>
                     </button>
 
-                    <button type="button" id="downloadPdfBtn" class="btn btn-success jd-btn">
-                        <i class="bi bi-download"></i> Download PDF
+                    <button type="button" id="downloadPdfBtn" class="btn btn-primary jd-btn">
+                        <i class="bi bi-download"></i>
+                        <span>Download PDF</span>
                     </button>
+                </div>
+            </div>
+
+            <div class="jd-workflow-card">
+                <div class="jd-workflow-status">
+                    <div class="jd-workflow-label">Workflow Approval</div>
+                    <div class="jd-workflow-main">
+                        <span class="jd-status-pill {{ $approvalStatusClass }}">
+                            {{ $approvalStatusText }}
+                        </span>
+
+                        @if($isWaitingHcmFinal)
+                            <span class="jd-action-note">
+                                Approval awal sudah tercatat. Dokumen menunggu pengesahan final HCM.
+                            </span>
+                        @elseif($isFinalApproval)
+                            <span class="jd-action-note">
+                                Dokumen sudah final approved. Link approval ditutup sampai ada pembaruan berikutnya.
+                            </span>
+                        @else
+                            <span class="jd-action-note">
+                                Dokumen masih menunggu approval awal dari approver departemen atau HCM.
+                            </span>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="jd-workflow-actions">
+                    @if($canShowApprovalLink)
+                        <a href="{{ route($prefix.'.jabatan.approval-page', $j->id_jabatan) }}"
+                           class="btn btn-outline-success jd-btn">
+                            <i class="bi bi-link-45deg"></i>
+                            <span>Kelola Link Approval</span>
+                        </a>
+                    @endif
+
+                    @if($role === 'hcm')
+                        <form method="POST"
+                              action="{{ route('hcm.jabatan.approval.confirm-final-from-show', $j->id_jabatan) }}"
+                              class="jd-inline-form"
+                              onsubmit="return confirm('Setujui final job description ini sebagai HCM? Setelah final, link approval akan ditutup.');">
+                            @csrf
+
+                            <button type="submit"
+                                    class="btn btn-success jd-btn"
+                                    {{ $canFinalApprove ? '' : 'disabled' }}>
+                                <i class="bi bi-check2-circle"></i>
+                                <span>Approve Final HCM</span>
+                            </button>
+                        </form>
+                    @endif
+
+                    <form method="POST"
+                          action="{{ route($prefix.'.jabatan.apply-approved-version', $j->id_jabatan) }}"
+                          class="jd-inline-form"
+                          onsubmit="return confirm('Terapkan job description approved final ini ke seluruh pegawai yang memegang jabatan tersebut?');">
+                        @csrf
+
+                        <button type="submit"
+                                class="btn btn-outline-success jd-btn"
+                                {{ $canApplyJobdesc ? '' : 'disabled' }}>
+                            <i class="bi bi-people"></i>
+                            <span>Terapkan ke Pegawai</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="jd-audit-card">
+                <div class="jd-audit-head">
+                    <div>
+                        <div class="jd-audit-title">Riwayat Approval Jabatan Ini</div>
+                        <div class="jd-audit-subtitle">
+                            Log di bawah hanya milik jabatan <strong>{{ $j->nama_jabatan ?? '-' }}</strong>, bukan gabungan seluruh jabatan.
+                        </div>
+                    </div>
+
+                    <span class="jd-audit-count">{{ $approvalLogs->count() }} aktivitas</span>
+                </div>
+
+                <div class="jd-audit-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle jd-audit-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Waktu</th>
+                                    <th>Aktivitas</th>
+                                    <th>Pengguna</th>
+                                    <th>Role</th>
+                                    <th>Jabatan</th>
+                                    <th>Departemen</th>
+                                    <th>Versi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($approvalLogs as $log)
+                                    <tr>
+                                        <td>{{ $formatTanggalApprovalLog($log->created_at) }}</td>
+                                        <td>{{ $log->action_label ?? '-' }}</td>
+                                        <td>{{ $log->actor_name ?? '-' }}</td>
+                                        <td>{{ strtoupper($log->actor_role ?? '-') }}</td>
+                                        <td>{{ $log->actor_jabatan ?? '-' }}</td>
+                                        <td>{{ $log->actor_departemen ?? '-' }}</td>
+                                        <td class="text-center">
+                                            {{ $log->version ? 'V'.$log->version->version_number : '-' }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-3">
+                                            Belum ada riwayat approval untuk jabatan ini.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -569,22 +758,151 @@ html, body{
 }
 
 .jd-action-bar{
-    padding-top:4px;
-    padding-bottom:18px;
+    margin-top:4px;
+    margin-bottom:18px;
 }
 
-.jd-top-actions{
+.jd-toolbar-card{
+    background:#ffffff;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    padding:14px 16px;
+    box-shadow:0 10px 28px rgba(15,23,42,.06);
     display:flex;
-    justify-content:space-between;
     align-items:center;
-    gap:12px;
+    justify-content:space-between;
+    gap:14px;
     flex-wrap:wrap;
 }
 
+.jd-toolbar-left,
+.jd-toolbar-right{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.jd-toolbar-title{
+    border-left:1px solid #e5e7eb;
+    padding-left:12px;
+    min-width:220px;
+}
+
+.jd-toolbar-label{
+    font-size:11px;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:#6b7280;
+    line-height:1.2;
+}
+
+.jd-toolbar-name{
+    font-size:14px;
+    font-weight:800;
+    color:#273957;
+    line-height:1.3;
+    max-width:440px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
 .jd-btn{
-    border-radius:10px;
+    border-radius:12px;
+    font-weight:700;
+    min-height:40px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    white-space:nowrap;
+}
+
+.jd-approval-action-card{
+    margin-top:10px;
+    background:#f8fafc;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+}
+
+.jd-approval-action-info{
+    min-width:260px;
+    flex:1;
+}
+
+.jd-approval-action-label{
+    font-size:11px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:#6b7280;
+    margin-bottom:6px;
+}
+
+.jd-approval-action-main{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.jd-status-pill{
+    display:inline-flex;
+    align-items:center;
+    padding:7px 11px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:900;
+    line-height:1;
+}
+
+.jd-status-pill.approved{
+    background:#dcfce7;
+    color:#166534;
+    border:1px solid #bbf7d0;
+}
+
+.jd-status-pill.pending{
+    background:#fef3c7;
+    color:#92400e;
+    border:1px solid #fde68a;
+}
+
+.jd-status-pill.rejected{
+    background:#fee2e2;
+    color:#991b1b;
+    border:1px solid #fecaca;
+}
+
+.jd-action-note{
+    font-size:13px;
+    color:#64748b;
     font-weight:600;
-    padding:9px 16px;
+}
+
+.jd-approval-action-buttons{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.jd-approval-action-buttons form{
+    margin:0;
+}
+
+.jd-approval-action-buttons .btn:disabled{
+    opacity:.55;
+    cursor:not-allowed;
 }
 
 .jd-paper-a4{
@@ -1278,6 +1596,37 @@ html, body{
     margin:0;
 }
 
+
+@media (max-width: 768px){
+    .jd-toolbar-card,
+    .jd-approval-action-card{
+        align-items:stretch;
+    }
+
+    .jd-toolbar-left,
+    .jd-toolbar-right,
+    .jd-approval-action-buttons{
+        width:100%;
+    }
+
+    .jd-toolbar-right .jd-btn,
+    .jd-approval-action-buttons .jd-btn,
+    .jd-approval-action-buttons form{
+        width:100%;
+    }
+
+    .jd-toolbar-title{
+        border-left:none;
+        padding-left:0;
+        width:100%;
+    }
+
+    .jd-toolbar-name{
+        max-width:100%;
+        white-space:normal;
+    }
+}
+
 @media print{
     html,
     body{
@@ -1324,7 +1673,8 @@ html, body{
 
     body:not(.jd-printing) .d-print-none,
     body:not(.jd-printing) .jd-action-bar,
-    body:not(.jd-printing) .jd-top-actions{
+    body:not(.jd-printing) .jd-toolbar-card,
+    body:not(.jd-printing) .jd-approval-action-card{
         display:none !important;
     }
 
@@ -1342,6 +1692,193 @@ html, body{
         border:0 !important;
         box-shadow:none !important;
         overflow:visible !important;
+    }
+}
+
+
+/* Corporate action panel: hanya area aksi, tidak mengubah desain A4 job description */
+.jd-corporate-panel{
+    margin-top:4px;
+    margin-bottom:18px;
+}
+
+.jd-command-card,
+.jd-workflow-card,
+.jd-audit-card{
+    background:#ffffff;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    box-shadow:0 10px 28px rgba(15,23,42,.06);
+}
+
+.jd-command-card{
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+}
+
+.jd-command-left,
+.jd-command-right,
+.jd-workflow-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.jd-command-title{
+    border-left:1px solid #e5e7eb;
+    padding-left:12px;
+    min-width:240px;
+}
+
+.jd-command-eyebrow,
+.jd-workflow-label{
+    font-size:11px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:#667085;
+    line-height:1.2;
+}
+
+.jd-command-name{
+    font-size:15px;
+    font-weight:900;
+    color:#273957;
+    line-height:1.3;
+    max-width:520px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.jd-command-meta{
+    margin-top:2px;
+    font-size:12px;
+    color:#667085;
+    font-weight:700;
+}
+
+.jd-btn-muted{
+    border:1px solid #e5e7eb;
+}
+
+.jd-workflow-card{
+    margin-top:10px;
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+    background:#f8fafc;
+}
+
+.jd-workflow-status{
+    flex:1;
+    min-width:280px;
+}
+
+.jd-workflow-main{
+    margin-top:6px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.jd-inline-form{
+    margin:0;
+}
+
+.jd-audit-card{
+    margin-top:10px;
+    overflow:hidden;
+}
+
+.jd-audit-head{
+    padding:14px 16px;
+    background:#ffffff;
+    border-bottom:1px solid #edf0ea;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.jd-audit-title{
+    font-size:14px;
+    font-weight:900;
+    color:#273957;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+}
+
+.jd-audit-subtitle{
+    font-size:12.5px;
+    color:#667085;
+    font-weight:600;
+    margin-top:2px;
+}
+
+.jd-audit-count{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:30px;
+    padding:6px 10px;
+    border-radius:999px;
+    background:#eef2eb;
+    color:#536044;
+    font-size:12px;
+    font-weight:900;
+}
+
+.jd-audit-body{
+    padding:0;
+}
+
+.jd-audit-table th{
+    background:#f6f8f4;
+    color:#536044;
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    border-bottom:1px solid #e5e7eb;
+    white-space:nowrap;
+}
+
+.jd-audit-table td{
+    font-size:12.5px;
+    color:#344054;
+    font-weight:600;
+    border-color:#edf0ea;
+}
+
+@media (max-width: 768px){
+    .jd-command-left,
+    .jd-command-right,
+    .jd-workflow-actions,
+    .jd-inline-form,
+    .jd-command-right .jd-btn,
+    .jd-workflow-actions .jd-btn{
+        width:100%;
+    }
+
+    .jd-command-title{
+        border-left:none;
+        padding-left:0;
+        width:100%;
+    }
+
+    .jd-command-name{
+        max-width:100%;
+        white-space:normal;
     }
 }
 </style>

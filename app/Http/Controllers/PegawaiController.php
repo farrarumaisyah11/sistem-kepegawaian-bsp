@@ -10,6 +10,7 @@ use App\Models\PengalamanBsp;
 use App\Models\PengalamanLuarBsp;
 use App\Models\Keluarga;
 use App\Models\Penilaian;
+use App\Models\Departemen;
 use Illuminate\Http\Request;
 use App\Models\Jabatan;
 use App\Models\JabatanVersion;
@@ -48,8 +49,9 @@ class PegawaiController extends Controller
         abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
 
         $jabatans = $this->jabatanOptions();
+        $departemenList = $this->departemenOptions();
 
-        return view('pegawai.create', compact('jabatans'));
+        return view('pegawai.create', compact('jabatans', 'departemenList'));
     }
 
     /* ===================== STORE ===================== */
@@ -59,8 +61,13 @@ class PegawaiController extends Controller
 
         $pegawaiPrefix = auth()->user()->role; // admin / hcm
 
+        // NIP disimpan sebagai string agar angka 0 di depan tidak hilang.
+        $request->merge([
+            'nip' => trim((string) $request->input('nip')),
+        ]);
+
         $request->validate([
-            'nip'  => ['required', 'integer'],
+            'nip'  => ['required', 'string', 'max:50'],
             'nama' => ['required', 'string', 'max:100'],
         ], [
             'nip.required'  => 'NIP wajib diisi.',
@@ -78,7 +85,7 @@ class PegawaiController extends Controller
         }
 
         $validated = $request->validate([
-            'nip'             => ['required', 'integer'],
+            'nip'             => ['required', 'string', 'max:50'],
             'nama'            => ['required', 'string', 'max:100'],
             'foto'            => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'tempat_lahir'    => ['nullable', 'string'],
@@ -90,6 +97,7 @@ class PegawaiController extends Controller
             'gol_upah'        => ['nullable', 'integer'],
             'gol_jabatan'     => ['nullable', 'integer'],
             'id_jabatan'      => ['nullable', 'integer', 'exists:tb_jabatan,id_jabatan'],
+            'id_departemen'   => ['nullable', 'integer', 'exists:tb_departemen,id_departemen'],
 
             'tmt_gol_jabatan' => ['nullable', 'date'],
             'tmt_gol_upah'    => ['nullable', 'date'],
@@ -164,9 +172,36 @@ class PegawaiController extends Controller
     }
 
     // ===================== HELPER =====================
-    protected function storeChildren(Pegawai $pegawai, Request $request)
+    protected function storeChildren(Pegawai $pegawai, Request $request): void
     {
-        $map = [
+        foreach ($this->childRelationMap() as $inputKey => $config) {
+            $relationName = $config['relation'];
+            $primaryKey   = $config['primary'];
+
+            $rows = $request->input($inputKey, []);
+
+            if (!is_array($rows)) {
+                continue;
+            }
+
+            foreach ($rows as $row) {
+                $row = $this->normalizeChildRow($row, $primaryKey);
+
+                if ($row === null) {
+                    continue;
+                }
+
+                unset($row[$primaryKey]);
+                $row['nip'] = (string) $pegawai->nip;
+
+                $pegawai->{$relationName}()->create($row);
+            }
+        }
+    }
+
+    private function childRelationMap(): array
+    {
+        return [
             'pendidikan' => ['relation' => 'pendidikan', 'primary' => 'id_pendidikan'],
             'kursus'     => ['relation' => 'kursus', 'primary' => 'id_kursus'],
             'peng_bsp'   => ['relation' => 'pengalamanBsp', 'primary' => 'id_pengalaman_bsp'],
@@ -174,22 +209,30 @@ class PegawaiController extends Controller
             'keluarga'   => ['relation' => 'keluarga', 'primary' => 'id_keluarga'],
             'penilaian'  => ['relation' => 'penilaian', 'primary' => 'id_penilaian'],
         ];
+    }
 
-        foreach ($map as $inputKey => $config) {
-            $relationName = $config['relation'];
-            $primaryKey   = $config['primary'];
+    private function normalizeChildRow($row, string $primaryKey): ?array
+    {
+        if (!is_array($row)) {
+            return null;
+        }
 
-            foreach ($request->input($inputKey, []) as $row) {
-                if (collect($row)->except([$primaryKey])->filter(fn($v) => $v !== null && $v !== '')->isEmpty()) {
-                    continue;
+        $row = collect($row)
+            ->map(function ($value) {
+                if (is_string($value)) {
+                    $value = trim($value);
                 }
 
-                unset($row[$primaryKey]);
-                $row['nip'] = $pegawai->nip;
+                return $value === '' ? null : $value;
+            })
+            ->toArray();
 
-                $pegawai->{$relationName}()->create($row);
-            }
-        }
+        $isEmptyRow = collect($row)
+            ->except([$primaryKey])
+            ->filter(fn ($value) => $value !== null && $value !== '')
+            ->isEmpty();
+
+        return $isEmptyRow ? null : $row;
     }
 
     protected function normalizeFotoPath(?string $foto): ?string
@@ -223,40 +266,18 @@ class PegawaiController extends Controller
     {
         $user = auth()->user();
 
-        // Admin or HCM roles can view all employee data
         if (in_array($user->role, ['admin', 'hcm'])) {
-            $pegawai->load([
-                'pendidikan',
-                'kursus',
-                'pengalamanBsp',
-                'pengalamanLuarBsp',
-                'keluarga',
-                'penilaian',
-                'masterJabatan',
-                'currentJobdeskVersion.version',
-                'jobdeskVersions.version',
-            ]);
+            $pegawai = $this->loadPegawaiProfile($pegawai);
 
             return view('pegawai.show', compact('pegawai'));
         }
 
-        // For "pegawai" role, only allow access to their own data
         if ($user->role === 'pegawai') {
             $nipUser = (string) ($user->nip ?? $user->username ?? '');
 
             abort_unless($nipUser === (string) $pegawai->nip, 403, 'Anda tidak memiliki akses');
 
-            $pegawai->load([
-                'pendidikan',
-                'kursus',
-                'pengalamanBsp',
-                'pengalamanLuarBsp',
-                'keluarga',
-                'penilaian',
-                'masterJabatan',
-                'currentJobdeskVersion.version',
-                'jobdeskVersions.version',
-            ]);
+            $pegawai = $this->loadPegawaiProfile($pegawai);
 
             return view('pegawai.show', compact('pegawai'));
         }
@@ -264,12 +285,9 @@ class PegawaiController extends Controller
         abort(403, 'Anda tidak memiliki akses');
     }
 
-    /* ===================== EDIT ===================== */
-    public function edit(Pegawai $pegawai)
+    private function pegawaiProfileRelations(): array
     {
-        abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
-
-        $pegawai->load([
+        return [
             'pendidikan',
             'kursus',
             'pengalamanBsp',
@@ -277,12 +295,31 @@ class PegawaiController extends Controller
             'keluarga',
             'penilaian',
             'masterJabatan',
+            'departemenMaster',
             'currentJobdeskVersion.version',
-        ]);
+            'jobdeskVersions.version',
+        ];
+    }
+
+    private function loadPegawaiProfile(Pegawai $pegawai): Pegawai
+    {
+        return Pegawai::query()
+            ->with($this->pegawaiProfileRelations())
+            ->where('nip', (string) $pegawai->nip)
+            ->firstOrFail();
+    }
+
+    /* ===================== EDIT ===================== */
+    public function edit(Pegawai $pegawai)
+    {
+        abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
+
+        $pegawai = $this->loadPegawaiProfile($pegawai);
 
         $jabatans = $this->jabatanOptions();
+        $departemenList = $this->departemenOptions();
 
-        return view('pegawai.edit', compact('pegawai', 'jabatans'));
+        return view('pegawai.edit', compact('pegawai', 'jabatans', 'departemenList'));
     }
 
     /* ===================== UPDATE ===================== */
@@ -292,8 +329,13 @@ class PegawaiController extends Controller
 
         $pegawaiPrefix = auth()->user()->role; // admin / hcm
 
+        // NIP tetap diperlakukan sebagai string agar angka 0 di depan aman.
+        $request->merge([
+            'nip' => trim((string) $request->input('nip', $pegawai->nip)),
+        ]);
+
         $validated = $request->validate([
-            'nip'             => ['required', 'integer'],
+            'nip'             => ['required', 'string', 'max:50'],
             'nama'            => ['required', 'string', 'max:100'],
             'foto'            => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'tempat_lahir'    => ['nullable', 'string'],
@@ -304,6 +346,7 @@ class PegawaiController extends Controller
             'gol_upah'        => ['nullable', 'integer'],
             'gol_jabatan'     => ['nullable', 'integer'],
             'id_jabatan'      => ['nullable', 'integer', 'exists:tb_jabatan,id_jabatan'],
+            'id_departemen'   => ['nullable', 'integer', 'exists:tb_departemen,id_departemen'],
             'tmt_gol_jabatan' => ['nullable', 'date'],
             'tmt_gol_upah'    => ['nullable', 'date'],
             'jabatan'         => ['nullable', 'string'],
@@ -413,8 +456,29 @@ class PegawaiController extends Controller
                 : $golJabatan;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Departemen
+        |--------------------------------------------------------------------------
+        | Jika jabatan dipilih, departemen mengikuti master jabatan.
+        | Jika jabatan kosong, departemen boleh dari dropdown departemen.
+        |--------------------------------------------------------------------------
+        */
+        $idDepartemen = $selectedJabatan?->id_departemen
+            ?? ($validated['id_departemen'] ?? null);
+
+        $departemenMaster = null;
+
+        if ($idDepartemen) {
+            $departemenMaster = Departemen::where('id_departemen', $idDepartemen)->first();
+        }
+
+        $namaDepartemen = $departemenMaster?->nama_departemen
+            ?? $selectedJabatan?->departemen
+            ?? ($validated['departemen'] ?? null);
+
         $data = [
-            'nip'             => $isUpdate ? $pegawai->nip : ($validated['nip'] ?? null),
+            'nip'             => $isUpdate ? (string) $pegawai->nip : (string) ($validated['nip'] ?? ''),
             'nama'            => $validated['nama'] ?? '',
             'tempat_lahir'    => $validated['tempat_lahir'] ?? null,
             'tgl_lahir'       => $validated['tgl_lahir'] ?? null,
@@ -423,14 +487,26 @@ class PegawaiController extends Controller
             'alamat'          => $validated['alamat'] ?? null,
             'gol_upah'        => $validated['gol_upah'] ?? null,
 
+            /*
+            |--------------------------------------------------------------------------
+            | Jabatan
+            |--------------------------------------------------------------------------
+            | Tidak ada pembatasan 1 jabatan hanya untuk 1 pegawai.
+            | Banyak pegawai boleh memakai id_jabatan yang sama sesuai formasi RPTK.
+            |--------------------------------------------------------------------------
+            */
             'id_jabatan'      => $selectedJabatan?->id_jabatan,
             'jabatan'         => $selectedJabatan?->nama_jabatan ?? null,
-            'departemen'      => $selectedJabatan?->departemen ?? ($validated['departemen'] ?? null),
+
+            'id_departemen'   => $idDepartemen,
+            'departemen'      => $namaDepartemen,
+
             'gol_jabatan'     => $golJabatan,
 
-            // INI YANG DIPERBAIKI:
             // Lokasi dari form diprioritaskan, baru fallback ke master jabatan.
-            'lokasi_kerja'    => $validated['lokasi_kerja'] ?? $selectedJabatan?->lokasi_kerja ?? null,
+            'lokasi_kerja'    => $validated['lokasi_kerja']
+                ?? $selectedJabatan?->lokasi_kerja
+                ?? null,
 
             'tmt_gol_jabatan' => $validated['tmt_gol_jabatan'] ?? null,
             'tmt_gol_upah'    => $validated['tmt_gol_upah'] ?? null,
@@ -454,10 +530,31 @@ class PegawaiController extends Controller
     private function jabatanOptions()
     {
         return Jabatan::query()
-            ->select('id_jabatan', 'nama_jabatan', 'departemen', 'gol_jabatan', 'lokasi_kerja')
+            ->with('departemenMaster')
+            ->select(
+                'id_jabatan',
+                'nama_jabatan',
+                'departemen',
+                'id_departemen',
+                'gol_jabatan',
+                'lokasi_kerja'
+            )
             ->whereNotNull('nama_jabatan')
-            ->orderBy('departemen')
+            ->orderBy('id_departemen')
             ->orderBy('nama_jabatan')
+            ->get();
+    }
+
+    private function departemenOptions()
+    {
+        return Departemen::query()
+            ->where(function ($q) {
+                $q->where('is_active', 1)
+                    ->orWhereNull('is_active');
+            })
+            ->orderBy('level_departemen')
+            ->orderBy('urutan')
+            ->orderBy('nama_departemen')
             ->get();
     }
 
@@ -469,7 +566,7 @@ class PegawaiController extends Controller
             return null;
         }
 
-        $jabatan = Jabatan::find($idJabatan);
+        $jabatan = Jabatan::with('departemenMaster')->find($idJabatan);
 
         if (!$jabatan) {
             throw ValidationException::withMessages([
@@ -477,9 +574,22 @@ class PegawaiController extends Controller
             ]);
         }
 
-        $departemen = $request->input('departemen');
+        /*
+        |--------------------------------------------------------------------------
+        | Validasi kesesuaian departemen
+        |--------------------------------------------------------------------------
+        | Ini bukan validasi pemangku. Jabatan tetap boleh dipakai banyak pegawai.
+        | Cek ini hanya memastikan dropdown departemen dan jabatan tidak silang.
+        |--------------------------------------------------------------------------
+        */
+        $idDepartemenInput = $request->input('id_departemen');
 
-        if ($departemen && $jabatan->departemen !== $departemen) {
+        if (
+            $idDepartemenInput !== null &&
+            $idDepartemenInput !== '' &&
+            $jabatan->id_departemen !== null &&
+            (string) $jabatan->id_departemen !== (string) $idDepartemenInput
+        ) {
             throw ValidationException::withMessages([
                 'id_jabatan' => 'Jabatan yang dipilih tidak sesuai dengan departemen.',
             ]);
@@ -489,71 +599,46 @@ class PegawaiController extends Controller
     }
 
     // Sync related data (update existing or delete if no longer present)
-    protected function syncChildren(Pegawai $pegawai, Request $request)
+    protected function syncChildren(Pegawai $pegawai, Request $request): void
     {
-        $map = [
-            'pendidikan' => ['relation' => 'pendidikan', 'primary' => 'id_pendidikan'],
-            'kursus'     => ['relation' => 'kursus', 'primary' => 'id_kursus'],
-            'peng_bsp'   => ['relation' => 'pengalamanBsp', 'primary' => 'id_pengalaman_bsp'],
-            'peng_luar'  => ['relation' => 'pengalamanLuarBsp', 'primary' => 'id_pengalaman_luar_bsp'],
-            'keluarga'   => ['relation' => 'keluarga', 'primary' => 'id_keluarga'],
-            'penilaian'  => ['relation' => 'penilaian', 'primary' => 'id_penilaian'],
-        ];
-
-        foreach ($map as $inputKey => $config) {
+        foreach ($this->childRelationMap() as $inputKey => $config) {
             $relationName = $config['relation'];
             $primaryKey   = $config['primary'];
 
-            // PENTING:
-            // Kalau input section tidak ikut terkirim, jangan hapus data lama.
-            // Ini mencegah kasus data section 2-7 hilang saat hanya edit section 1.
-            $allInput = $request->all();
-            if (!array_key_exists($inputKey, $allInput)) {
+            // Jika section tidak ikut terkirim, jangan hapus data lama.
+            // Ini aman untuk form bertahap/tab dan menjaga logika sistem lama.
+            if (!array_key_exists($inputKey, $request->all())) {
                 continue;
             }
 
             $submittedRows = $request->input($inputKey, []);
-            $keptIds = [];
 
             if (!is_array($submittedRows)) {
                 $submittedRows = [];
             }
 
+            $keptIds = [];
+
             foreach ($submittedRows as $row) {
-                if (!is_array($row)) {
-                    continue;
-                }
+                $row = $this->normalizeChildRow($row, $primaryKey);
 
-                // Ubah string kosong menjadi null agar aman untuk kolom nullable/date.
-                $row = collect($row)->map(function ($value) {
-                    return $value === '' ? null : $value;
-                })->toArray();
-
-                // Lewati baris yang benar-benar kosong, kecuali primary key.
-                $isEmptyRow = collect($row)
-                    ->except([$primaryKey])
-                    ->filter(function ($value) {
-                        return $value !== null && $value !== '';
-                    })
-                    ->isEmpty();
-
-                if ($isEmptyRow) {
+                if ($row === null) {
                     continue;
                 }
 
                 $id = $row[$primaryKey] ?? null;
 
                 unset($row[$primaryKey]);
-                $row['nip'] = $pegawai->nip;
+                $row['nip'] = (string) $pegawai->nip;
 
-                if (!empty($id)) {
+                if ($id !== null && $id !== '') {
                     $existing = $pegawai->{$relationName}()
                         ->where($primaryKey, $id)
                         ->first();
 
                     if ($existing) {
                         $existing->update($row);
-                        $keptIds[] = $id;
+                        $keptIds[] = $existing->{$primaryKey};
                     } else {
                         $new = $pegawai->{$relationName}()->create($row);
                         $keptIds[] = $new->{$primaryKey};
@@ -564,8 +649,6 @@ class PegawaiController extends Controller
                 }
             }
 
-            // Hapus data lama yang memang tidak ada lagi di form.
-            // Kalau form section dikirim tapi semua baris kosong, artinya section itu dikosongkan.
             if (!empty($keptIds)) {
                 $pegawai->{$relationName}()
                     ->whereNotIn($primaryKey, $keptIds)

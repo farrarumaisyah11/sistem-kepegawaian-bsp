@@ -8,6 +8,8 @@ class Penilaian extends Model
 {
     protected $table = 'tb_penilaian';
     protected $primaryKey = 'id_penilaian';
+    public $incrementing = true;
+    protected $keyType = 'int';
     public $timestamps = false;
 
     protected $fillable = [
@@ -15,12 +17,13 @@ class Penilaian extends Model
         'tahun_penilaian',
         'nilai_penilaian',
         'dasar_penilaian',
+
     ];
 
     protected $casts = [
-        'nip'              => 'integer',
-        'tahun_penilaian'  => 'integer',
-        'nilai_penilaian'  => 'float',
+        'nip' => 'string',
+        'tahun_penilaian' => 'integer',
+        'nilai_penilaian' => 'float',
     ];
 
     public function pegawai()

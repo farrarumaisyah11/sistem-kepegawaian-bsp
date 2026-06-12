@@ -11,20 +11,18 @@ class JabatanVersion extends Model
 
     public $incrementing = true;
     protected $keyType = 'int';
-
     public $timestamps = false;
 
     protected $fillable = [
         'id_jabatan',
         'version_number',
-
         'nama_jabatan',
         'departemen',
+        'id_departemen',
         'gol_jabatan',
         'home_base',
         'lokasi_kerja',
         'parent_jabatan',
-
         'tujuan_jabatan',
         'tanggung_jawab',
         'tantangan_jabatan',
@@ -38,18 +36,14 @@ class JabatanVersion extends Model
         'pengetahuan_keterampilan',
         'kompetensi',
         'syarat_kompetensi_jabatan',
-
         'min_pendidikan',
         'min_pengalaman',
         'min_nilai',
-
         'struktur_file',
         'status',
-
         'created_by',
         'created_by_name',
         'created_at',
-
         'approved_by',
         'approved_by_name',
         'approved_by_role',
@@ -57,10 +51,8 @@ class JabatanVersion extends Model
         'approved_by_departemen',
         'approved_at',
         'approval_catatan',
-
         'effective_from',
         'effective_until',
-
         'approval_flow_status',
         'proposed_approved_by',
         'proposed_approved_by_name',
@@ -76,6 +68,10 @@ class JabatanVersion extends Model
     ];
 
     protected $casts = [
+        'id_jabatan' => 'integer',
+        'version_number' => 'integer',
+        'id_departemen' => 'integer',
+        'parent_jabatan' => 'integer',
         'created_at' => 'datetime',
         'approved_at' => 'datetime',
         'effective_from' => 'datetime',
@@ -94,9 +90,35 @@ class JabatanVersion extends Model
         return $this->belongsTo(Jabatan::class, 'id_jabatan', 'id_jabatan');
     }
 
+    public function departemenMaster()
+    {
+        return $this->belongsTo(Departemen::class, 'id_departemen', 'id_departemen');
+    }
+
+    public function parentJabatan()
+    {
+        return $this->belongsTo(Jabatan::class, 'parent_jabatan', 'id_jabatan');
+    }
+
+    public function parentJabatanMaster()
+    {
+        return $this->parentJabatan();
+    }
+
+    public function childrenByParent()
+    {
+        return $this->hasMany(self::class, 'parent_jabatan', 'id_jabatan');
+    }
+
     public function pegawaiAssignments()
     {
         return $this->hasMany(PegawaiJabatanVersion::class, 'id_jabatan_version', 'id_jabatan_version');
+    }
+
+    public function approvalLogs()
+    {
+        return $this->hasMany(JabatanApprovalLog::class, 'id_jabatan_version', 'id_jabatan_version')
+            ->orderByDesc('created_at');
     }
 
     public function getStatusLabelAttribute()
@@ -158,7 +180,7 @@ class JabatanVersion extends Model
         return $this->stringToArray($this->syarat_kompetensi_jabatan);
     }
 
-    private function stringToArray($value)
+    private function stringToArray($value): array
     {
         if (!$value) {
             return [];

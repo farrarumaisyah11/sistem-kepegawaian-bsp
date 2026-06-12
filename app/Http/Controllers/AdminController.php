@@ -23,12 +23,14 @@ class AdminController extends Controller
     public function show($id)
     {
         $pegawai = Pegawai::findOrFail($id);
+
         return view('admin.pegawai.show', compact('pegawai'));
     }
 
     public function edit($id)
     {
         $pegawai = Pegawai::findOrFail($id);
+
         return view('admin.pegawai.edit', compact('pegawai'));
     }
 
@@ -57,12 +59,14 @@ class AdminController extends Controller
     public function jabatanIndex()
     {
         $jabatan = Jabatan::all();
+
         return view('admin.jabatan.index', compact('jabatan'));
     }
 
     public function jabatanShow($id)
     {
         $jabatan = Jabatan::findOrFail($id);
+
         return view('admin.jabatan.show', compact('jabatan'));
     }
 
@@ -81,6 +85,7 @@ class AdminController extends Controller
     public function jabatanEdit($id)
     {
         $jabatan = Jabatan::findOrFail($id);
+
         return view('admin.jabatan.edit', compact('jabatan'));
     }
 

@@ -8,6 +8,8 @@ class Pelatihan extends Model
 {
     protected $table = 'tb_kursus';
     protected $primaryKey = 'id_kursus';
+    public $incrementing = true;
+    protected $keyType = 'int';
     public $timestamps = false;
 
     protected $fillable = [
@@ -18,14 +20,15 @@ class Pelatihan extends Model
         'jenis_kursus',
         'tanggal_mulai_berlaku',
         'tanggal_selesai_berlaku',
+
     ];
 
     protected $casts = [
-        'nip'                       => 'integer',
-        'tanggal_mulai_kursus'      => 'date',
-        'tanggal_selesai_kursus'    => 'date',
-        'tanggal_mulai_berlaku'     => 'date',
-        'tanggal_selesai_berlaku'   => 'date',
+        'nip' => 'string',
+        'tanggal_mulai_kursus' => 'date',
+        'tanggal_selesai_kursus' => 'date',
+        'tanggal_mulai_berlaku' => 'date',
+        'tanggal_selesai_berlaku' => 'date',
     ];
 
     public function pegawai()

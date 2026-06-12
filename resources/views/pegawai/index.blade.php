@@ -38,8 +38,8 @@
     <div class="card table-card">
         <div class="card-body">
             <div class="table-responsive mt-3">
-            <table id="datatable" class="table table-bordered w-100 approval-table">
-                        <thead>
+                <table id="datatable" class="table table-bordered w-100 approval-table">
+                    <thead>
                         <tr>
                             <th>No</th>
                             <th>NIP</th>
@@ -54,6 +54,16 @@
 
                     <tbody>
                         @foreach($pegawai as $i => $item)
+                            @php
+                                $namaDepartemen = $item->departemenMaster->nama_departemen
+                                    ?? $item->departemen
+                                    ?? '-';
+
+                                $namaJabatan = $item->masterJabatan->nama_jabatan
+                                    ?? $item->jabatan
+                                    ?? '-';
+                            @endphp
+
                             <tr>
                                 <td class="text-center">{{ $i + 1 }}</td>
 
@@ -66,11 +76,11 @@
                                 </td>
 
                                 <td class="text-center">
-                                    {{ $item->departemen ?? '-' }}
+                                    {{ $namaDepartemen }}
                                 </td>
 
                                 <td>
-                                    {{ $item->jabatan ?? '-' }}
+                                    {{ $namaJabatan }}
                                 </td>
 
                                 <td class="text-center">
@@ -85,7 +95,6 @@
 
                                 <td class="text-center">
                                     <div class="action-group">
-                                        {{-- EDIT --}}
                                         <a href="{{ route(auth()->user()->role.'.pegawai.edit', $item) }}"
                                            class="icon-btn icon-edit"
                                            title="Edit Pegawai">
@@ -95,7 +104,6 @@
                                             </svg>
                                         </a>
 
-                                        {{-- DETAIL --}}
                                         <a href="{{ route('pegawai.show', $item) }}"
                                            class="icon-btn icon-view"
                                            title="Lihat Detail">
@@ -105,7 +113,6 @@
                                             </svg>
                                         </a>
 
-                                        {{-- DELETE --}}
                                         <form action="{{ route(auth()->user()->role.'.pegawai.destroy', $item) }}"
                                               method="POST"
                                               class="delete-form d-inline"
@@ -205,17 +212,6 @@
 
     .table-card .card-body {
         padding: 20px 22px;
-    }
-
-    .table-title {
-        color: #273957;
-        font-size: 18px;
-        font-weight: 700;
-    }
-
-    .table-subtitle {
-        color: #6b7280;
-        font-size: 13px;
     }
 
     .approval-table {
@@ -437,9 +433,9 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-       $('#datatable').DataTable({
-        responsive: false,
-        scrollX: true,
+        $('#datatable').DataTable({
+            responsive: false,
+            scrollX: true,
             pageLength: 10,
             lengthMenu: [5, 10, 25, 50, 100],
             order: [[0, 'asc']],

@@ -2,46 +2,58 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\JabatanExport;
+use App\Models\Departemen;
 use App\Models\Jabatan;
+use App\Models\JabatanApprovalLog;
 use App\Models\JabatanVersion;
 use App\Models\Pegawai;
 use App\Models\PegawaiJabatanVersion;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use App\Exports\JabatanExport;
-use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class JabatanController extends Controller
 {
     public function index(Request $request)
     {
-        $search = trim((string) $request->input('search'));
-
         $jabatans = Jabatan::query()
-            ->with(['activeVersion', 'pendingVersion'])
+            ->with([
+                'activeVersion',
+                'pendingVersion',
+                'departemenMaster',
+                'parent',
+            ])
             ->withCount('pegawai')
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($r) use ($search) {
-                    $r->where('nama_jabatan', 'like', "%{$search}%")
-                        ->orWhere('departemen', 'like', "%{$search}%")
-                        ->orWhere('lokasi_kerja', 'like', "%{$search}%")
-                        ->orWhere('home_base', 'like', "%{$search}%");
-                });
-            })
-            ->orderByDesc('id_jabatan')
-            ->paginate(10)
-            ->appends(['search' => $search]);
+            ->orderBy('id_departemen')
+            ->orderByRaw('parent_jabatan IS NULL DESC')
+            ->orderBy('parent_jabatan')
+            ->orderBy('nama_jabatan')
+            ->get();
 
-        return view('jabatan.index', compact('jabatans', 'search'));
+        return view('jabatan.index', compact('jabatans'));
     }
 
     public function create()
     {
-        return view('jabatan.create');
+        $departemenList = Departemen::query()
+            ->where('is_active', 1)
+            ->orderBy('level_departemen')
+            ->orderBy('urutan')
+            ->orderBy('nama_departemen')
+            ->get();
+
+        $parentOptions = Jabatan::query()
+            ->with('departemenMaster')
+            ->orderBy('id_departemen')
+            ->orderBy('nama_jabatan')
+            ->get();
+
+        return view('jabatan.create', compact('departemenList', 'parentOptions'));
     }
 
     public function store(Request $request)
@@ -50,6 +62,7 @@ class JabatanController extends Controller
         $data = $this->prepareJabatanData($request, $data);
 
         $data['approval_status'] = 'pending';
+        $data['approval_flow_status'] = 'pending';
         $data['approval_token'] = (string) Str::uuid();
 
         if ($request->hasFile('struktur_file')) {
@@ -58,7 +71,6 @@ class JabatanController extends Controller
 
         $jabatan = DB::transaction(function () use ($data) {
             $jabatan = Jabatan::create($data);
-
             $version = $this->createJobdeskVersion($jabatan, $data, 'pending');
 
             $jabatan->forceFill([
@@ -68,6 +80,11 @@ class JabatanController extends Controller
                 'jobdesk_updated_at' => null,
                 'jobdesk_updated_by' => null,
             ])->save();
+
+            $this->recordApprovalLog($jabatan->fresh(), 'draft_created', [
+                'id_jabatan_version' => $version->id_jabatan_version,
+                'metadata' => ['version_number' => $version->version_number],
+            ]);
 
             return $jabatan;
         });
@@ -79,27 +96,68 @@ class JabatanController extends Controller
 
     public function show(Jabatan $jabatan)
     {
-        $jabatan->load(['activeVersion', 'pendingVersion', 'versions' => function ($q) {
-            $q->orderByDesc('version_number');
-        }]);
+        $jabatan->load([
+            'activeVersion',
+            'pendingVersion',
+            'departemenMaster',
+            'parent.departemenMaster',
+            'pegawai',
+            'approvalLogs' => function ($query) use ($jabatan) {
+                $query->where('id_jabatan', $jabatan->id_jabatan)
+                    ->with('version')
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id_jabatan_approval_log');
+            },
+            'versions' => function ($q) {
+                $q->orderByDesc('version_number');
+            },
+        ]);
 
         return view('jabatan.show', compact('jabatan'));
     }
 
     public function edit(Jabatan $jabatan)
     {
-        $jabatan->load(['activeVersion', 'pendingVersion']);
+        $jabatan->load([
+            'activeVersion',
+            'pendingVersion',
+            'departemenMaster',
+            'parent',
+        ]);
 
-        return view('jabatan.edit', compact('jabatan'));
+        $departemenList = Departemen::query()
+            ->where('is_active', 1)
+            ->orderBy('level_departemen')
+            ->orderBy('urutan')
+            ->orderBy('nama_departemen')
+            ->get();
+
+        $parentOptions = Jabatan::query()
+            ->with('departemenMaster')
+            ->where('id_jabatan', '!=', $jabatan->id_jabatan)
+            ->orderBy('id_departemen')
+            ->orderBy('nama_jabatan')
+            ->get();
+
+        return view('jabatan.edit', compact('jabatan', 'departemenList', 'parentOptions'));
     }
 
     public function update(Request $request, Jabatan $jabatan)
     {
-        $data = $this->validateJabatan($request);
+        $data = $this->validateJabatan($request, $jabatan);
         $data = $this->prepareJabatanData($request, $data);
 
         $data['approval_status'] = 'pending';
-        $data['approval_token'] = $jabatan->approval_token ?: (string) Str::uuid();
+        $data['approval_flow_status'] = 'pending';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Token selalu dibuat baru setiap ada pembaruan job description.
+        | Token lama tidak dipakai ulang agar link approval versi sebelumnya tidak
+        | menjadi pintu approval untuk versi baru.
+        |--------------------------------------------------------------------------
+        */
+        $data['approval_token'] = (string) Str::uuid();
 
         $data['approved_by'] = null;
         $data['approved_by_name'] = null;
@@ -108,6 +166,19 @@ class JabatanController extends Controller
         $data['approved_by_departemen'] = null;
         $data['approved_at'] = null;
         $data['approval_catatan'] = null;
+
+        $data['proposed_approved_by'] = null;
+        $data['proposed_approved_by_name'] = null;
+        $data['proposed_approved_by_role'] = null;
+        $data['proposed_approved_by_jabatan'] = null;
+        $data['proposed_approved_by_departemen'] = null;
+        $data['proposed_approved_at'] = null;
+        $data['proposed_approval_catatan'] = null;
+
+        $data['hcm_confirmed_by'] = null;
+        $data['hcm_confirmed_by_name'] = null;
+        $data['hcm_confirmed_at'] = null;
+        $data['hcm_confirmation_catatan'] = null;
 
         if ($request->hasFile('struktur_file')) {
             if (!empty($jabatan->struktur_file) && Storage::disk('public')->exists($jabatan->struktur_file)) {
@@ -127,33 +198,80 @@ class JabatanController extends Controller
                 'latest_version_number' => $version->version_number,
             ])->save();
 
-            $this->syncPegawaiByJabatan($jabatan);
+            $this->syncPegawaiByJabatan($jabatan->fresh());
+
+            $this->recordApprovalLog($jabatan->fresh(), 'draft_updated', [
+                'id_jabatan_version' => $version->id_jabatan_version,
+                'metadata' => ['version_number' => $version->version_number],
+            ]);
         });
 
         return redirect()
             ->route($this->routeName('jabatan.show'), $jabatan)
-            ->with('success_auto', 'Data jabatan berhasil diperbarui dan menunggu approval ulang.');
+            ->with('success_auto', 'Data jabatan berhasil diperbarui dan menunggu approval ulang. Link approval baru sudah dibuat.');
     }
 
     public function destroy(Jabatan $jabatan)
     {
-        $jumlahPegawai = Pegawai::where('id_jabatan', $jabatan->id_jabatan)->count();
+        abort_unless(in_array(auth()->user()->role, ['admin', 'hcm']), 403);
 
-        if ($jumlahPegawai > 0) {
-            return back()->withErrors([
-                'jabatan' => 'Jabatan tidak dapat dihapus karena masih digunakan oleh ' . $jumlahPegawai . ' pegawai.'
-            ]);
+        $role = auth()->user()->role;
+        $indexRoute = $role . '.jabatan.index';
+        $pesanError = [];
+
+        $pegawaiPemangku = Pegawai::query()
+            ->where('id_jabatan', $jabatan->id_jabatan)
+            ->orderBy('nama')
+            ->get(['nip', 'nama']);
+
+        if ($pegawaiPemangku->count() > 0) {
+            $daftarPegawai = $pegawaiPemangku
+                ->take(5)
+                ->map(fn ($pegawai) => $pegawai->nama . ' - NIP ' . $pegawai->nip)
+                ->implode(', ');
+
+            $pesanError[] = 'Jabatan "' . $jabatan->nama_jabatan . '" tidak dapat dihapus karena masih dipangku oleh '
+                . $pegawaiPemangku->count()
+                . ' pegawai'
+                . ($daftarPegawai ? ', yaitu: ' . $daftarPegawai . '.' : '.');
         }
 
-        if (!empty($jabatan->struktur_file) && Storage::disk('public')->exists($jabatan->struktur_file)) {
-            Storage::disk('public')->delete($jabatan->struktur_file);
+        $jabatanBawahan = Jabatan::query()
+            ->where('parent_jabatan', $jabatan->id_jabatan)
+            ->orderBy('nama_jabatan')
+            ->get(['id_jabatan', 'nama_jabatan']);
+
+        if ($jabatanBawahan->count() > 0) {
+            $daftarBawahan = $jabatanBawahan
+                ->take(5)
+                ->map(fn ($child) => $child->nama_jabatan)
+                ->implode(', ');
+
+            $pesanError[] = 'Jabatan "' . $jabatan->nama_jabatan . '" tidak dapat dihapus karena masih menjadi atasan/parent dari '
+                . $jabatanBawahan->count()
+                . ' jabatan bawahan'
+                . ($daftarBawahan ? ', yaitu: ' . $daftarBawahan . '.' : '.');
         }
 
-        $jabatan->delete();
+        if (!empty($pesanError)) {
+            return redirect()->route($indexRoute)->with('delete_error', $pesanError);
+        }
 
-        return redirect()
-            ->route($this->routeName('jabatan.index'))
-            ->with('success_auto', 'Data jabatan berhasil dihapus.');
+        try {
+            $namaJabatan = $jabatan->nama_jabatan;
+            $this->recordApprovalLog($jabatan, 'jabatan_deleted');
+            $jabatan->delete();
+
+            return redirect()
+                ->route($indexRoute)
+                ->with('success', 'Jabatan "' . $namaJabatan . '" berhasil dihapus.');
+        } catch (QueryException $e) {
+            return redirect()
+                ->route($indexRoute)
+                ->with('delete_error', [
+                    'Jabatan "' . $jabatan->nama_jabatan . '" tidak dapat dihapus karena masih memiliki relasi dengan data lain dalam sistem.',
+                ]);
+        }
     }
 
     public function print(Jabatan $jabatan)
@@ -171,51 +289,90 @@ class JabatanController extends Controller
         );
     }
 
-    private function validateJabatan(Request $request): array
+    public function versions(Jabatan $jabatan)
     {
-        return $request->validate([
-            'nama_jabatan'                    => 'required|string|max:100',
-            'departemen'                      => 'nullable|string|max:100',
-            'gol_jabatan'                     => 'nullable|string|max:50',
-            'home_base'                       => 'nullable|string|max:100',
-            'lokasi_kerja'                    => 'nullable|string|max:100',
-            'tujuan_jabatan'                  => 'nullable|string',
+        $jabatan->load(['versions', 'activeVersion', 'pendingVersion']);
 
-            'tanggung_jawab'                  => 'nullable|array',
-            'tanggung_jawab.*'                => 'nullable|string',
+        return view('jabatan.versions.index', compact('jabatan'));
+    }
 
-            'tantangan_jabatan'               => 'nullable|array',
-            'tantangan_jabatan.*'             => 'nullable|string',
+    public function showVersion(Jabatan $jabatan, JabatanVersion $version)
+    {
+        abort_unless((int) $version->id_jabatan === (int) $jabatan->id_jabatan, 404);
 
-            'dim_keuangan'                    => 'nullable|string',
-            'dim_nonkeuangan'                 => 'nullable|string',
-            'bawahan_langsung'                => 'nullable|string',
+        $jabatan->load(['activeVersion', 'pendingVersion']);
+        $version->load(['departemenMaster', 'parentJabatanMaster']);
 
-            'internal_perusahaan'             => 'nullable|array',
-            'internal_perusahaan.*'           => 'nullable|string',
+        return view('jabatan.versions.show', compact('jabatan', 'version'));
+    }
 
-            'external_perusahaan'             => 'nullable|array',
-            'external_perusahaan.*'           => 'nullable|string',
-
-            'finansial'                       => 'nullable|string',
-            'non_finansial'                   => 'nullable|string',
-
-            'pengetahuan_keterampilan'        => 'nullable|array',
-            'pengetahuan_keterampilan.*'      => 'nullable|string',
-
-            'kompetensi'                      => 'nullable|array',
-            'kompetensi.*'                    => 'nullable|string',
-
-            'syarat_kompetensi_jabatan'       => 'nullable|array',
-            'syarat_kompetensi_jabatan.*'     => 'nullable|string',
-
-            'parent_jabatan'                  => 'nullable|integer|exists:tb_jabatan,id_jabatan',
-            'struktur_file'                   => 'nullable|file|mimes:pdf,png,jpg,jpeg|max:2048',
+    private function validateJabatan(Request $request, ?Jabatan $jabatan = null): array
+    {
+        $data = $request->validate([
+            'nama_jabatan' => 'required|string|max:100',
+            'id_departemen' => 'nullable|integer|exists:tb_departemen,id_departemen',
+            'departemen' => 'nullable|string|max:100',
+            'gol_jabatan' => 'nullable|string|max:50',
+            'home_base' => 'nullable|string|max:100',
+            'lokasi_kerja' => 'nullable|string|max:100',
+            'tujuan_jabatan' => 'nullable|string',
+            'tanggung_jawab' => 'nullable|array',
+            'tanggung_jawab.*' => 'nullable|string',
+            'tantangan_jabatan' => 'nullable|array',
+            'tantangan_jabatan.*' => 'nullable|string',
+            'dim_keuangan' => 'nullable|string',
+            'dim_nonkeuangan' => 'nullable|string',
+            'bawahan_langsung' => 'nullable|string',
+            'internal_perusahaan' => 'nullable|array',
+            'internal_perusahaan.*' => 'nullable|string',
+            'external_perusahaan' => 'nullable|array',
+            'external_perusahaan.*' => 'nullable|string',
+            'finansial' => 'nullable|string',
+            'non_finansial' => 'nullable|string',
+            'pengetahuan_keterampilan' => 'nullable|array',
+            'pengetahuan_keterampilan.*' => 'nullable|string',
+            'kompetensi' => 'nullable|array',
+            'kompetensi.*' => 'nullable|string',
+            'syarat_kompetensi_jabatan' => 'nullable|array',
+            'syarat_kompetensi_jabatan.*' => 'nullable|string',
+            'parent_jabatan' => 'nullable|integer|exists:tb_jabatan,id_jabatan',
+            'struktur_file' => 'nullable|file|mimes:pdf,png,jpg,jpeg|max:2048',
         ]);
+
+        if (
+            $jabatan &&
+            !empty($data['parent_jabatan']) &&
+            (string) $data['parent_jabatan'] === (string) $jabatan->id_jabatan
+        ) {
+            abort(422, 'Parent jabatan tidak boleh sama dengan jabatan itu sendiri.');
+        }
+
+        return $data;
     }
 
     private function prepareJabatanData(Request $request, array $data): array
     {
+        if (!empty($data['id_departemen'])) {
+            $departemen = Departemen::where('id_departemen', $data['id_departemen'])
+                ->where('is_active', 1)
+                ->first();
+
+            if ($departemen) {
+                $data['departemen'] = $departemen->nama_departemen;
+                $data['id_departemen'] = $departemen->id_departemen;
+            }
+        } elseif (!empty($data['departemen'])) {
+            $departemen = Departemen::query()
+                ->whereRaw('LOWER(TRIM(nama_departemen)) = ?', [strtolower(trim($data['departemen']))])
+                ->orWhereRaw('LOWER(TRIM(singkatan)) = ?', [strtolower(trim($data['departemen']))])
+                ->first();
+
+            if ($departemen) {
+                $data['departemen'] = $departemen->nama_departemen;
+                $data['id_departemen'] = $departemen->id_departemen;
+            }
+        }
+
         $data['tanggung_jawab'] = $this->joinArrayLines($request->input('tanggung_jawab', []));
         $data['tantangan_jabatan'] = $this->joinArrayLines($request->input('tantangan_jabatan', []));
         $data['internal_perusahaan'] = $this->joinArrayLines($request->input('internal_perusahaan', []));
@@ -236,14 +393,13 @@ class JabatanController extends Controller
             'id_jabatan' => $jabatan->id_jabatan,
             'version_number' => $nextVersionNumber,
             'status' => $status,
-
             'nama_jabatan' => $data['nama_jabatan'] ?? $jabatan->nama_jabatan,
             'departemen' => $data['departemen'] ?? $jabatan->departemen,
+            'id_departemen' => $data['id_departemen'] ?? $jabatan->id_departemen,
             'gol_jabatan' => $data['gol_jabatan'] ?? $jabatan->gol_jabatan,
             'home_base' => $data['home_base'] ?? $jabatan->home_base,
             'lokasi_kerja' => $data['lokasi_kerja'] ?? $jabatan->lokasi_kerja,
             'parent_jabatan' => $data['parent_jabatan'] ?? $jabatan->parent_jabatan,
-
             'tujuan_jabatan' => $data['tujuan_jabatan'] ?? null,
             'tanggung_jawab' => $data['tanggung_jawab'] ?? null,
             'tantangan_jabatan' => $data['tantangan_jabatan'] ?? null,
@@ -258,10 +414,10 @@ class JabatanController extends Controller
             'kompetensi' => $data['kompetensi'] ?? null,
             'syarat_kompetensi_jabatan' => $data['syarat_kompetensi_jabatan'] ?? null,
             'struktur_file' => $data['struktur_file'] ?? $jabatan->struktur_file ?? null,
-
             'created_by' => $user?->getKey(),
             'created_by_name' => $user->nama ?? $user->name ?? $user->username ?? null,
             'created_at' => now(),
+            'approval_flow_status' => $status === 'approved' ? 'approved_final' : 'pending',
         ]);
     }
 
@@ -269,9 +425,10 @@ class JabatanController extends Controller
     {
         Pegawai::where('id_jabatan', $jabatan->id_jabatan)
             ->update([
-                'jabatan'      => $jabatan->nama_jabatan,
-                'departemen'   => $jabatan->departemen,
-                'gol_jabatan'  => is_numeric($jabatan->gol_jabatan) ? (int) $jabatan->gol_jabatan : null,
+                'jabatan' => $jabatan->nama_jabatan,
+                'departemen' => $jabatan->departemen,
+                'id_departemen' => $jabatan->id_departemen,
+                'gol_jabatan' => is_numeric($jabatan->gol_jabatan) ? (int) $jabatan->gol_jabatan : null,
                 'lokasi_kerja' => $jabatan->lokasi_kerja,
             ]);
     }
@@ -282,9 +439,9 @@ class JabatanController extends Controller
 
         $jabatan->load('activeVersion');
 
-        if (!$jabatan->activeVersion) {
+        if (!$jabatan->is_approval_final || !$jabatan->activeVersion || $jabatan->pendingVersion) {
             return back()->withErrors([
-                'jobdesk' => 'Belum ada versi job description yang sudah approved untuk diterapkan.'
+                'jobdesk' => 'Job description hanya dapat diterapkan setelah status approved final dan tidak ada versi pending.',
             ]);
         }
 
@@ -292,11 +449,13 @@ class JabatanController extends Controller
 
         if ($pegawaiAktif->isEmpty()) {
             return back()->withErrors([
-                'jobdesk' => 'Belum ada pegawai aktif yang menggunakan jabatan ini.'
+                'jobdesk' => 'Belum ada pegawai aktif yang menggunakan jabatan ini.',
             ]);
         }
 
-        DB::transaction(function () use ($jabatan, $pegawaiAktif) {
+        $appliedCount = 0;
+
+        DB::transaction(function () use ($jabatan, $pegawaiAktif, &$appliedCount) {
             $user = auth()->user();
 
             foreach ($pegawaiAktif as $pegawai) {
@@ -328,10 +487,20 @@ class JabatanController extends Controller
                     'assigned_by_name' => $user->nama ?? $user->name ?? $user->username ?? null,
                     'is_current' => 1,
                 ]);
+
+                $appliedCount++;
             }
+
+            $this->recordApprovalLog($jabatan, 'jobdesc_applied_to_pegawai', [
+                'id_jabatan_version' => $jabatan->activeVersion->id_jabatan_version,
+                'metadata' => [
+                    'applied_count' => $appliedCount,
+                    'total_pegawai' => $pegawaiAktif->count(),
+                ],
+            ]);
         });
 
-        return back()->with('success_auto', 'Versi job description approved berhasil diterapkan ke pegawai aktif. Riwayat versi sebelumnya tetap tersimpan.');
+        return back()->with('success_auto', 'Versi job description approved final berhasil diterapkan ke pegawai. Jumlah pegawai diperbarui: ' . $appliedCount . '.');
     }
 
     private function joinArrayLines(array $items = []): ?string
@@ -363,11 +532,43 @@ class JabatanController extends Controller
     {
         abort_unless(auth()->check() && in_array(auth()->user()->role, ['admin', 'hcm'], true), 403);
 
-        $jabatan = $this->ensureApprovalToken($jabatan);
         $jabatan->load(['activeVersion', 'pendingVersion']);
 
-        $approvalUrl = $this->buildApprovalUrl($jabatan);
-        $isLocalApprovalUrl = $this->isLocalApprovalUrl($approvalUrl);
+        if (!$jabatan->is_approval_final && !$jabatan->is_waiting_hcm_final) {
+            $jabatan = $this->ensureApprovalToken($jabatan);
+        }
+
+        $jabatan->load([
+            'approvalLogs' => function ($query) use ($jabatan) {
+                $query->where('id_jabatan', $jabatan->id_jabatan)
+                    ->with('version')
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id_jabatan_approval_log');
+            },
+        ]);
+
+        $approvalUrl = $jabatan->approval_token
+            ? $this->buildApprovalUrl($jabatan)
+            : null;
+
+        $isLocalApprovalUrl = $approvalUrl ? $this->isLocalApprovalUrl($approvalUrl) : false;
+
+        $this->recordApprovalLog($jabatan, 'approval_page_opened', [
+            'id_jabatan_version' => $jabatan->draft_version_id,
+            'metadata' => [
+                'scope' => 'single_jabatan',
+                'id_jabatan' => $jabatan->id_jabatan,
+            ],
+        ]);
+
+        $jabatan->load([
+            'approvalLogs' => function ($query) use ($jabatan) {
+                $query->where('id_jabatan', $jabatan->id_jabatan)
+                    ->with('version')
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id_jabatan_approval_log');
+            },
+        ]);
 
         return view('jabatan.approval-page', compact('jabatan', 'approvalUrl', 'isLocalApprovalUrl'));
     }
@@ -376,7 +577,10 @@ class JabatanController extends Controller
     {
         abort_unless(auth()->check() && in_array(auth()->user()->role, ['admin', 'hcm'], true), 403);
 
-        $jabatan = $this->ensureApprovalToken($jabatan);
+        if ($jabatan->is_approval_final || empty($jabatan->approval_token)) {
+            abort(404, 'QR approval tidak tersedia untuk job description yang sudah approved final.');
+        }
+
         $approvalUrl = $this->buildApprovalUrl($jabatan);
 
         $qrSvg = QrCode::format('svg')
@@ -388,6 +592,30 @@ class JabatanController extends Controller
         return response($qrSvg, 200)
             ->header('Content-Type', 'image/svg+xml')
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    public function approvalShortLink(string $token)
+    {
+        $jabatan = Jabatan::where('approval_token', $token)->firstOrFail();
+
+        return redirect()->route('jabatan.approval.scan', [
+            'jabatan' => $jabatan->id_jabatan,
+            'token' => $token,
+        ]);
+    }
+
+    public function recordApprovalLinkShare(Request $request, Jabatan $jabatan)
+    {
+        abort_unless(auth()->check() && in_array(auth()->user()->role, ['admin', 'hcm'], true), 403);
+
+        $this->recordApprovalLog($jabatan, 'approval_link_copied', [
+            'id_jabatan_version' => $jabatan->draft_version_id,
+            'metadata' => [
+                'source' => $request->input('source', 'unknown'),
+            ],
+        ]);
+
+        return response()->json(['ok' => true]);
     }
 
     private function ensureApprovalToken(Jabatan $jabatan): Jabatan
@@ -405,11 +633,9 @@ class JabatanController extends Controller
 
     private function buildApprovalUrl(Jabatan $jabatan): string
     {
-        $jabatan = $this->ensureApprovalToken($jabatan);
-
         $approvalPath = route('jabatan.approval.scan', [
             'jabatan' => $jabatan->id_jabatan,
-            'token'   => $jabatan->approval_token,
+            'token' => $jabatan->approval_token,
         ], false);
 
         $baseUrl = config('app.approval_url')
@@ -435,140 +661,254 @@ class JabatanController extends Controller
     }
 
     public function approvalScan(Jabatan $jabatan, string $token)
-{
-    $this->validateApprovalToken($jabatan, $token);
-    $this->ensureUserCanOpenApproval();
+    {
+        $this->validateApprovalToken($jabatan, $token);
 
-    $jabatan->load(['activeVersion', 'pendingVersion']);
+        $jabatan->load(['activeVersion', 'pendingVersion', 'parent']);
+        $this->ensureUserCanOpenApprovalForJabatan($jabatan);
 
-    $user = auth()->user();
-    $pegawaiApprover = $this->getPegawaiApprover();
+        $this->recordApprovalLog($jabatan, 'approval_link_opened', [
+            'id_jabatan_version' => $jabatan->draft_version_id,
+        ]);
 
-    return view('jabatan.approval-scan', compact('jabatan', 'user', 'pegawaiApprover', 'token'));
-}
+        $user = auth()->user();
+        $pegawaiApprover = $this->getPegawaiApprover();
 
-public function approvalDetail(Jabatan $jabatan, string $token)
-{
-    $this->validateApprovalToken($jabatan, $token);
-    $this->ensureUserCanOpenApproval();
-
-    $jabatan->load(['activeVersion', 'pendingVersion']);
-
-    return view('jabatan.show', compact('jabatan'));
-}
-
-public function approvalApprove(Request $request, Jabatan $jabatan, string $token)
-{
-    $this->validateApprovalToken($jabatan, $token);
-    $this->ensureUserCanOpenApproval();
-
-    $request->validate([
-        'approval_catatan' => ['nullable', 'string'],
-        'approval_password' => ['required', 'string'],
-    ], [
-        'approval_password.required' => 'Password wajib diisi untuk konfirmasi approval.',
-    ]);
-
-    $user = auth()->user();
-
-    if (!$user || !Hash::check((string) $request->approval_password, (string) $user->password)) {
-        return back()
-            ->withErrors(['approval_password' => 'Password yang Anda masukkan tidak sesuai.'])
-            ->withInput($request->except('approval_password'));
+        return view('jabatan.approval-scan', compact('jabatan', 'user', 'pegawaiApprover', 'token'));
     }
 
-    $pegawaiApprover = $this->getPegawaiApprover();
+    public function approvalDetail(Jabatan $jabatan, string $token)
+    {
+        $this->validateApprovalToken($jabatan, $token);
+        $this->ensureUserCanOpenApprovalForJabatan($jabatan);
 
-    if ($user->role === 'pegawai' && !$pegawaiApprover) {
-        return back()->withErrors([
-            'approval' => 'Data pegawai untuk akun ini tidak ditemukan. Approval tidak dapat diproses.'
+        $jabatan->load(['activeVersion', 'pendingVersion', 'parent']);
+
+        $this->recordApprovalLog($jabatan, 'approval_detail_opened', [
+            'id_jabatan_version' => $jabatan->draft_version_id,
+        ]);
+
+        return view('jabatan.approval-detail', compact('jabatan', 'token'));
+    }
+
+    public function approvalApprove(Request $request, Jabatan $jabatan, string $token)
+    {
+        $this->validateApprovalToken($jabatan, $token);
+        $this->ensureUserCanOpenApprovalForJabatan($jabatan);
+
+        $request->validate([
+            'approval_catatan' => ['nullable', 'string'],
+        ]);
+
+        $user = auth()->user();
+        $pegawaiApprover = $this->getPegawaiApprover();
+
+        if ($user->role === 'pegawai' && !$pegawaiApprover) {
+            return back()->withErrors([
+                'approval' => 'Data pegawai untuk akun ini tidak ditemukan. Approval tidak dapat diproses.',
+            ]);
+        }
+
+        DB::transaction(function () use ($request, $jabatan, $user, $pegawaiApprover) {
+            $jabatan->refresh();
+            $jabatan->load(['activeVersion', 'pendingVersion']);
+
+            if (!$this->isApprovalActionable($jabatan)) {
+                throw new \RuntimeException($this->approvalClosedMessage($jabatan));
+            }
+
+            $pendingVersion = $jabatan->pendingVersion;
+
+            if (!$pendingVersion) {
+                throw new \RuntimeException('Tidak ada versi pending untuk di-approve.');
+            }
+
+            $approverData = $this->buildApproverData($user, $pegawaiApprover, $request->approval_catatan);
+
+            if ($user->role === 'hcm') {
+                $this->finalizeApproval($jabatan, $pendingVersion, $approverData, $request->approval_catatan, true, 'approved_final_by_hcm_direct');
+            } else {
+                $pendingVersion->update(array_merge($approverData, [
+                    'approval_flow_status' => 'waiting_hcm_confirmation',
+                    'status' => 'pending',
+                ]));
+
+                $jabatan->update(array_merge($approverData, [
+                    'approval_status' => 'pending',
+                    'approval_flow_status' => 'waiting_hcm_confirmation',
+                ]));
+
+                $this->recordApprovalLog($jabatan->fresh(), 'approved_by_pegawai_waiting_hcm', [
+                    'id_jabatan_version' => $pendingVersion->id_jabatan_version,
+                    'metadata' => [
+                        'version_number' => $pendingVersion->version_number,
+                    ],
+                ]);
+            }
+        });
+
+        return redirect()
+            ->route('jabatan.approval.scan', [
+                'jabatan' => $jabatan->id_jabatan,
+                'token' => $token,
+            ])
+            ->with('success_auto', auth()->user()->role === 'hcm'
+                ? 'Job description berhasil di-approve final oleh HCM.'
+                : 'Approval awal berhasil dicatat dan menunggu pengesahan final HCM.');
+    }
+
+    public function approvalConfirmFinalFromShow(Request $request, Jabatan $jabatan)
+    {
+        abort_unless((auth()->user()->role ?? null) === 'hcm', 403, 'Hanya HCM yang dapat melakukan approval final.');
+
+        $request->validate([
+            'hcm_confirmation_catatan' => ['nullable', 'string'],
+        ]);
+
+        DB::transaction(function () use ($request, $jabatan) {
+            $jabatan->refresh();
+            $jabatan->load(['activeVersion', 'pendingVersion']);
+
+            if (!$jabatan->is_waiting_hcm_final || !$jabatan->pendingVersion) {
+                throw new \RuntimeException('Approval final HCM hanya dapat dilakukan setelah approval awal pegawai tercatat dan masih ada versi pending.');
+            }
+
+            $approverData = $this->buildApproverDataFromPendingVersion($jabatan->pendingVersion);
+
+            $this->finalizeApproval(
+                $jabatan,
+                $jabatan->pendingVersion,
+                $approverData,
+                $request->hcm_confirmation_catatan,
+                false,
+                'approved_final_by_hcm_from_show'
+            );
+        });
+
+        return back()->with('success_auto', 'Job description berhasil di-approve final oleh HCM.');
+    }
+
+    public function approvalConfirmFinal(Request $request, Jabatan $jabatan, string $token)
+    {
+        return redirect()
+            ->route('hcm.jabatan.show', $jabatan->id_jabatan)
+            ->withErrors([
+                'approval' => 'Approval final HCM dilakukan dari halaman detail jabatan internal, bukan dari link approval.',
+            ]);
+    }
+
+    private function finalizeApproval(
+        Jabatan $jabatan,
+        JabatanVersion $pendingVersion,
+        array $approverData,
+        ?string $hcmCatatan = null,
+        bool $hcmDirectApprove = false,
+        string $logAction = 'approved_final_by_hcm_direct'
+    ): void {
+        $hcmUser = auth()->user();
+
+        if ($jabatan->activeVersion) {
+            $jabatan->activeVersion->update([
+                'status' => 'archived',
+                'effective_until' => now(),
+            ]);
+        }
+
+        $pendingVersion->update(array_merge($approverData, [
+            'status' => 'approved',
+            'approval_flow_status' => 'approved_final',
+            'approved_by' => $approverData['proposed_approved_by'],
+            'approved_by_name' => $approverData['proposed_approved_by_name'],
+            'approved_by_role' => $approverData['proposed_approved_by_role'],
+            'approved_by_jabatan' => $approverData['proposed_approved_by_jabatan'],
+            'approved_by_departemen' => $approverData['proposed_approved_by_departemen'],
+            'approved_at' => $approverData['proposed_approved_at'],
+            'approval_catatan' => $approverData['proposed_approval_catatan'],
+            'hcm_confirmed_by' => $hcmUser?->getKey(),
+            'hcm_confirmed_by_name' => $hcmUser->nama ?? $hcmUser->name ?? $hcmUser->username ?? 'HCM',
+            'hcm_confirmed_at' => $hcmDirectApprove ? $approverData['proposed_approved_at'] : now(),
+            'hcm_confirmation_catatan' => $hcmCatatan,
+            'effective_from' => now(),
+            'effective_until' => null,
+        ]));
+
+        $this->syncMasterJabatanFromVersion($jabatan, $pendingVersion);
+
+        $jabatan->update(array_merge($approverData, [
+            'approval_status' => 'approved',
+            'approval_flow_status' => 'approved_final',
+            'approved_by' => $approverData['proposed_approved_by'],
+            'approved_by_name' => $approverData['proposed_approved_by_name'],
+            'approved_by_role' => $approverData['proposed_approved_by_role'],
+            'approved_by_jabatan' => $approverData['proposed_approved_by_jabatan'],
+            'approved_by_departemen' => $approverData['proposed_approved_by_departemen'],
+            'approved_at' => $approverData['proposed_approved_at'],
+            'approval_catatan' => $approverData['proposed_approval_catatan'],
+            'hcm_confirmed_by' => $hcmUser?->getKey(),
+            'hcm_confirmed_by_name' => $hcmUser->nama ?? $hcmUser->name ?? $hcmUser->username ?? 'HCM',
+            'hcm_confirmed_at' => $hcmDirectApprove ? $approverData['proposed_approved_at'] : now(),
+            'hcm_confirmation_catatan' => $hcmCatatan,
+            'active_version_id' => $pendingVersion->id_jabatan_version,
+            'draft_version_id' => null,
+            'latest_version_number' => $pendingVersion->version_number,
+            'approval_token' => null,
+            'jobdesk_updated_at' => now(),
+            'jobdesk_updated_by' => $hcmUser?->getKey(),
+        ]));
+
+        $this->recordApprovalLog($jabatan->fresh(), $logAction, [
+            'id_jabatan_version' => $pendingVersion->id_jabatan_version,
+            'metadata' => [
+                'version_number' => $pendingVersion->version_number,
+                'hcm_direct_approve' => $hcmDirectApprove,
+            ],
         ]);
     }
 
-    DB::transaction(function () use ($request, $jabatan, $user, $pegawaiApprover) {
-        $jabatan->refresh();
-        $jabatan->load(['activeVersion', 'pendingVersion']);
+    private function syncMasterJabatanFromVersion(Jabatan $jabatan, JabatanVersion $version): void
+    {
+        $jabatan->forceFill([
+            'nama_jabatan' => $version->nama_jabatan,
+            'departemen' => $version->departemen,
+            'id_departemen' => $version->id_departemen,
+            'gol_jabatan' => $version->gol_jabatan,
+            'home_base' => $version->home_base,
+            'lokasi_kerja' => $version->lokasi_kerja,
+            'parent_jabatan' => $version->parent_jabatan,
+            'tujuan_jabatan' => $version->tujuan_jabatan,
+            'tanggung_jawab' => $version->tanggung_jawab,
+            'tantangan_jabatan' => $version->tantangan_jabatan,
+            'dim_keuangan' => $version->dim_keuangan,
+            'dim_nonkeuangan' => $version->dim_nonkeuangan,
+            'bawahan_langsung' => $version->bawahan_langsung,
+            'internal_perusahaan' => $version->internal_perusahaan,
+            'external_perusahaan' => $version->external_perusahaan,
+            'finansial' => $version->finansial,
+            'non_finansial' => $version->non_finansial,
+            'pengetahuan_keterampilan' => $version->pengetahuan_keterampilan,
+            'kompetensi' => $version->kompetensi,
+            'syarat_kompetensi_jabatan' => $version->syarat_kompetensi_jabatan,
+        ])->save();
 
-        $pendingVersion = $jabatan->pendingVersion;
+        $this->syncPegawaiByJabatan($jabatan->fresh());
+    }
 
-        if (!$pendingVersion) {
-            $pendingVersion = $this->createJobdeskVersion($jabatan, $jabatan->toArray(), 'pending');
-
-            $jabatan->forceFill([
-                'draft_version_id' => $pendingVersion->id_jabatan_version,
-                'latest_version_number' => $pendingVersion->version_number,
-            ])->save();
-        }
-
-        $approverData = [
-            'proposed_approved_by' => $user->getKey(),
+    private function buildApproverData($user, ?Pegawai $pegawaiApprover, ?string $catatan): array
+    {
+        return [
+            'proposed_approved_by' => $user?->getKey(),
             'proposed_approved_by_name' => $pegawaiApprover->nama ?? $user->nama ?? $user->name ?? $user->username ?? 'Approver',
             'proposed_approved_by_role' => $user->role,
             'proposed_approved_by_jabatan' => $pegawaiApprover->jabatan ?? strtoupper((string) $user->role),
             'proposed_approved_by_departemen' => $pegawaiApprover->departemen ?? '-',
             'proposed_approved_at' => now(),
-            'proposed_approval_catatan' => $request->approval_catatan,
+            'proposed_approval_catatan' => $catatan,
         ];
-
-        if ($user->role === 'hcm') {
-            $this->finalizeApproval($jabatan, $pendingVersion, $approverData, $request->approval_catatan, true);
-        } else {
-            $pendingVersion->update(array_merge($approverData, [
-                'approval_flow_status' => 'waiting_hcm_confirmation',
-                'status' => 'pending',
-            ]));
-
-            $jabatan->update(array_merge($approverData, [
-                'approval_status' => 'pending',
-                'approval_flow_status' => 'waiting_hcm_confirmation',
-            ]));
-        }
-    });
-
-    return redirect()
-        ->route('jabatan.approval.scan', [
-            'jabatan' => $jabatan->id_jabatan,
-            'token' => $token,
-        ])
-        ->with('success_auto', auth()->user()->role === 'hcm'
-            ? 'Job description berhasil di-approve final oleh HCM.'
-            : 'Approval berhasil dicatat dan menunggu pengesahan HCM.');
-}
-
-public function approvalConfirmFinal(Request $request, Jabatan $jabatan, string $token)
-{
-    $this->validateApprovalToken($jabatan, $token);
-
-    abort_unless((auth()->user()->role ?? null) === 'hcm', 403, 'Hanya HCM yang dapat mengesahkan approval final.');
-
-    $request->validate([
-        'hcm_confirmation_catatan' => ['nullable', 'string'],
-        'approval_password' => ['required', 'string'],
-    ], [
-        'approval_password.required' => 'Password HCM wajib diisi.',
-    ]);
-
-    $user = auth()->user();
-
-    if (!$user || !Hash::check((string) $request->approval_password, (string) $user->password)) {
-        return back()->withErrors(['approval_password' => 'Password HCM tidak sesuai.']);
     }
 
-    DB::transaction(function () use ($request, $jabatan, $user) {
-        $jabatan->refresh();
-        $jabatan->load(['activeVersion', 'pendingVersion']);
-
-        $pendingVersion = $jabatan->pendingVersion;
-
-        if (!$pendingVersion) {
-            throw new \RuntimeException('Tidak ada versi pending untuk dikonfirmasi.');
-        }
-
-        if (!$pendingVersion->proposed_approved_at) {
-            throw new \RuntimeException('Belum ada approval dari approver pegawai.');
-        }
-
-        $approverData = [
+    private function buildApproverDataFromPendingVersion(JabatanVersion $pendingVersion): array
+    {
+        return [
             'proposed_approved_by' => $pendingVersion->proposed_approved_by,
             'proposed_approved_by_name' => $pendingVersion->proposed_approved_by_name,
             'proposed_approved_by_role' => $pendingVersion->proposed_approved_by_role,
@@ -577,104 +917,110 @@ public function approvalConfirmFinal(Request $request, Jabatan $jabatan, string 
             'proposed_approved_at' => $pendingVersion->proposed_approved_at,
             'proposed_approval_catatan' => $pendingVersion->proposed_approval_catatan,
         ];
-
-        $this->finalizeApproval($jabatan, $pendingVersion, $approverData, $request->hcm_confirmation_catatan, false);
-    });
-
-    return back()->with('success_auto', 'Approval pegawai berhasil disahkan final oleh HCM.');
-}
-
-private function finalizeApproval(
-    Jabatan $jabatan,
-    JabatanVersion $pendingVersion,
-    array $approverData,
-    ?string $hcmCatatan = null,
-    bool $hcmDirectApprove = false
-): void {
-    $hcmUser = auth()->user();
-
-    if ($jabatan->activeVersion) {
-        $jabatan->activeVersion->update([
-            'status' => 'archived',
-            'effective_until' => now(),
-        ]);
     }
 
-    $pendingVersion->update(array_merge($approverData, [
-        'status' => 'approved',
-        'approval_flow_status' => 'approved_final',
+    private function isApprovalActionable(Jabatan $jabatan): bool
+    {
+        return !$jabatan->is_approval_final
+            && !$jabatan->is_waiting_hcm_final
+            && !empty($jabatan->draft_version_id)
+            && !empty($jabatan->approval_token);
+    }
 
-        'approved_by' => $approverData['proposed_approved_by'],
-        'approved_by_name' => $approverData['proposed_approved_by_name'],
-        'approved_by_role' => $approverData['proposed_approved_by_role'],
-        'approved_by_jabatan' => $approverData['proposed_approved_by_jabatan'],
-        'approved_by_departemen' => $approverData['proposed_approved_by_departemen'],
-        'approved_at' => $approverData['proposed_approved_at'],
-        'approval_catatan' => $approverData['proposed_approval_catatan'],
+    private function approvalClosedMessage(Jabatan $jabatan): string
+    {
+        if ($jabatan->is_approval_final) {
+            return 'Job description ini sudah approved final. Link approval tidak aktif lagi.';
+        }
 
-        'hcm_confirmed_by' => $hcmUser?->getKey(),
-        'hcm_confirmed_by_name' => $hcmUser->nama ?? $hcmUser->name ?? $hcmUser->username ?? 'HCM',
-        'hcm_confirmed_at' => $hcmDirectApprove ? $approverData['proposed_approved_at'] : now(),
-        'hcm_confirmation_catatan' => $hcmCatatan,
+        if ($jabatan->is_waiting_hcm_final) {
+            return 'Approval awal sudah tercatat. Dokumen sedang menunggu approval final HCM dari halaman detail jabatan.';
+        }
 
-        'effective_from' => now(),
-        'effective_until' => null,
-    ]));
+        return 'Approval tidak dapat diproses untuk status dokumen saat ini.';
+    }
 
-    $jabatan->update(array_merge($approverData, [
-        'approval_status' => 'approved',
-        'approval_flow_status' => 'approved_final',
+    private function ensureUserCanOpenApprovalForJabatan(Jabatan $jabatan): void
+    {
+        $user = auth()->user();
+        abort_unless($user, 403, 'Anda harus login untuk mengakses halaman approval.');
 
-        'approved_by' => $approverData['proposed_approved_by'],
-        'approved_by_name' => $approverData['proposed_approved_by_name'],
-        'approved_by_role' => $approverData['proposed_approved_by_role'],
-        'approved_by_jabatan' => $approverData['proposed_approved_by_jabatan'],
-        'approved_by_departemen' => $approverData['proposed_approved_by_departemen'],
-        'approved_at' => $approverData['proposed_approved_at'],
-        'approval_catatan' => $approverData['proposed_approval_catatan'],
+        if ($user->role === 'hcm') {
+            return;
+        }
 
-        'hcm_confirmed_by' => $hcmUser?->getKey(),
-        'hcm_confirmed_by_name' => $hcmUser->nama ?? $hcmUser->name ?? $hcmUser->username ?? 'HCM',
-        'hcm_confirmed_at' => $hcmDirectApprove ? $approverData['proposed_approved_at'] : now(),
-        'hcm_confirmation_catatan' => $hcmCatatan,
+        if ($user->role === 'pegawai') {
+            $nipLogin = $user->nip ?? $user->username ?? session('nip') ?? session('login_nip') ?? null;
+            $pegawaiLogin = Pegawai::where('nip', $nipLogin)->first();
 
-        'active_version_id' => $pendingVersion->id_jabatan_version,
-        'draft_version_id' => null,
-        'latest_version_number' => $pendingVersion->version_number,
-        'jobdesk_updated_at' => now(),
-        'jobdesk_updated_by' => $hcmUser?->getKey(),
-    ]));
-}
+            abort_unless($pegawaiLogin, 403, 'Data pegawai login tidak ditemukan.');
 
-private function ensureUserCanOpenApproval(): void
-{
-    $role = auth()->user()->role ?? null;
+            $departemenPegawai = trim(strtolower((string) ($pegawaiLogin->departemen ?? '')));
+            $departemenJabatan = trim(strtolower((string) (
+                $jabatan->pendingVersion->departemen
+                ?? $jabatan->activeVersion->departemen
+                ?? $jabatan->departemen
+                ?? ''
+            )));
 
-    abort_unless(
-        in_array($role, ['hcm', 'pegawai'], true),
-        403,
-        'Anda tidak memiliki akses untuk membuka halaman approval job description.'
-    );
-}
+            abort_unless(
+                $departemenPegawai !== '' &&
+                $departemenJabatan !== '' &&
+                $departemenPegawai === $departemenJabatan,
+                403,
+                'Anda tidak berwenang mengakses approval jabatan di luar departemen Anda.'
+            );
 
-private function validateApprovalToken(Jabatan $jabatan, string $token): void
-{
-    abort_unless(
-        !empty($jabatan->approval_token)
-        && hash_equals((string) $jabatan->approval_token, (string) $token),
-        403,
-        'Token approval tidak valid.'
-    );
-} 
+            return;
+        }
+
+        abort(403, 'Anda tidak berwenang mengakses approval jabatan ini.');
+    }
+
+    private function validateApprovalToken(Jabatan $jabatan, string $token): void
+    {
+        abort_unless(
+            !empty($jabatan->approval_token)
+            && hash_equals((string) $jabatan->approval_token, (string) $token),
+            403,
+            'Token approval tidak valid atau sudah tidak aktif.'
+        );
+    }
 
     private function getPegawaiApprover(): ?Pegawai
     {
         $user = auth()->user();
         $nipUser = $user->nip ?? $user->username ?? null;
 
-        return $nipUser
-            ? Pegawai::where('nip', $nipUser)->first()
-            : null;
+        return $nipUser ? Pegawai::where('nip', $nipUser)->first() : null;
+    }
+
+    private function recordApprovalLog(Jabatan $jabatan, string $action, array $options = []): void
+    {
+        if (!auth()->check()) {
+            return;
+        }
+
+        $user = auth()->user();
+        $pegawai = $this->getPegawaiApprover();
+
+        JabatanApprovalLog::create([
+            'id_jabatan' => $jabatan->id_jabatan,
+            'id_jabatan_version' => $options['id_jabatan_version'] ?? $jabatan->draft_version_id ?? $jabatan->active_version_id,
+            'approval_token' => $jabatan->approval_token,
+            'action' => $action,
+            'actor_user_id' => $user?->getKey(),
+            'actor_nip' => $pegawai->nip ?? $user->nip ?? $user->username ?? null,
+            'actor_name' => $pegawai->nama ?? $user->nama ?? $user->name ?? $user->username ?? null,
+            'actor_role' => $user->role ?? null,
+            'actor_jabatan' => $pegawai->jabatan ?? strtoupper((string) ($user->role ?? '')),
+            'actor_departemen' => $pegawai->departemen ?? null,
+            'actor_id_departemen' => $pegawai->id_departemen ?? null,
+            'ip_address' => request()->ip(),
+            'user_agent' => substr((string) request()->userAgent(), 0, 500),
+            'metadata' => $options['metadata'] ?? null,
+            'created_at' => now(),
+        ]);
     }
 
     private function routeName(string $name): string
@@ -683,7 +1029,7 @@ private function validateApprovalToken(Jabatan $jabatan, string $token): void
 
         return match ($role) {
             'admin' => 'admin.' . $name,
-            'hcm'   => 'hcm.' . $name,
+            'hcm' => 'hcm.' . $name,
             default => 'hcm.' . $name,
         };
     }

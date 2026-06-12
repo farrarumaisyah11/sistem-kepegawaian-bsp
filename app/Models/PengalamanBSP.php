@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class PengalamanBSP extends Model
+class PengalamanBsp extends Model
 {
     protected $table = 'tb_pengalaman_bsp';
     protected $primaryKey = 'id_pengalaman_bsp';
+    public $incrementing = true;
+    protected $keyType = 'int';
     public $timestamps = false;
 
     protected $fillable = [
@@ -17,12 +19,13 @@ class PengalamanBSP extends Model
         'jenjang_jabatan_bsp',
         'pengalaman_jabatan',
         'pengalaman_lokasi',
+
     ];
 
     protected $casts = [
-        'nip'                 => 'integer',
-        'pglmn_bsp_mulai'     => 'date',
-        'pglmn_bsp_selesai'   => 'date',
+        'nip' => 'string',
+        'pglmn_bsp_mulai' => 'date',
+        'pglmn_bsp_selesai' => 'date',
     ];
 
     public function pegawai()
