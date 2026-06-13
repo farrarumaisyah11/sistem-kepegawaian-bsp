@@ -5,6 +5,7 @@
 @section('content')
 @php
     $namaJabatan = $version->nama_jabatan ?? $jabatan->nama_jabatan ?? '-';
+
     $namaDepartemen = $jabatan->departemenMaster->nama_departemen
         ?? $version->departemen
         ?? $jabatan->departemen
@@ -13,311 +14,624 @@
     $namaParent = $parent
         ? ($parent->activeVersion->nama_jabatan ?? $parent->latestApprovedVersion->nama_jabatan ?? $parent->nama_jabatan)
         : 'Root / Jabatan Utama';
+
+    $pemangkuAktif = $jabatan->pemangkuSaatIni ?? collect();
+    $riwayatPemangku = $jabatan->riwayatPemangku ?? collect();
+
+    $jumlahPemangkuAktif = $pemangkuAktif->count();
+    $jumlahRiwayat = $riwayatPemangku->count();
+    $isVacant = $jumlahPemangkuAktif < 1;
 @endphp
 
 <style>
-    .structure-detail-page {
-        padding-bottom: 34px;
-        background: #f7f9f5;
+    :root{
+        --sd-navy:#273957;
+        --sd-olive:#6b775c;
+        --sd-olive-dark:#4f5c40;
+        --sd-bg:#f6f8f4;
+        --sd-card:#ffffff;
+        --sd-border:#dfe5d7;
+        --sd-border-soft:#edf0ea;
+        --sd-text:#1f2937;
+        --sd-muted:#667085;
+        --sd-gold:#f4c542;
+        --sd-shadow:0 14px 35px rgba(15,23,42,.07);
     }
 
-    .detail-hero {
-        background: linear-gradient(135deg, #273957 0%, #3f4a32 100%);
-        color: #ffffff;
-        border-radius: 22px;
-        padding: 24px 28px;
-        margin-bottom: 22px;
-        box-shadow: 0 14px 35px rgba(15, 23, 42, .16);
+    footer,
+    .footer,
+    .main-footer,
+    .app-footer{
+        position:static !important;
+        bottom:auto !important;
+        top:auto !important;
+        margin-top:28px !important;
     }
 
-    .detail-eyebrow {
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 2px;
-        color: #f4c542;
-        text-transform: uppercase;
-        margin-bottom: 8px;
+    .structure-detail-page{
+        min-height:calc(100dvh - 150px);
+        padding:24px 18px 36px;
+        background:var(--sd-bg);
+        color:var(--sd-text);
     }
 
-    .detail-title {
-        font-size: 27px;
-        font-weight: 900;
-        margin-bottom: 6px;
-        letter-spacing: -.3px;
+    .structure-detail-shell{
+        width:100%;
+        max-width:1320px;
+        margin:0 auto;
     }
 
-    .detail-subtitle {
-        color: rgba(255,255,255,.78);
-        font-size: 14px;
-        line-height: 1.6;
-        margin: 0;
+    .detail-hero{
+        background:linear-gradient(135deg, #6b775c 0%, #4f5c40 100%);
+        color:#ffffff;
+        border-radius:22px;
+        padding:24px 26px;
+        margin-bottom:16px;
+        box-shadow:0 14px 35px rgba(15,23,42,.08);
+        border:1px solid rgba(255,255,255,.12);
     }
 
-    .btn-back-structure {
-        min-height: 42px;
-        padding: 10px 16px;
-        border-radius: 14px;
-        border: 1px solid rgba(255,255,255,.28);
-        background: rgba(255,255,255,.12);
-        color: #ffffff;
-        font-weight: 800;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+    .detail-hero-inner{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:18px;
+        flex-wrap:wrap;
     }
 
-    .btn-back-structure:hover {
-        background: rgba(255,255,255,.22);
-        color: #ffffff;
+    .detail-eyebrow{
+        font-size:12px;
+        letter-spacing:1.2px;
+        text-transform:uppercase;
+        color:#ffffff;
+        margin-bottom:8px;
+        font-weight:700;
+        opacity:.9;
     }
 
-    .detail-card {
-        border: 1px solid #edf0ea;
-        border-radius: 20px;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, .07);
-        overflow: hidden;
-        background: #ffffff;
+    .detail-title{
+        font-size:clamp(23px, 2.3vw, 32px);
+        font-weight:700;
+        margin:0 0 6px;
+        line-height:1.2;
+        color:#ffffff;
     }
 
-    .detail-card-header {
-        background: #fbfcfa;
-        border-bottom: 1px solid #edf0ea;
-        padding: 16px 18px;
-        color: #273957;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: .3px;
-        font-size: 14px;
+    .detail-subtitle{
+        margin:0;
+        color:rgba(255,255,255,.78);
+        font-size:14px;
+        line-height:1.6;
+        max-width:780px;
+        font-weight:400;
     }
 
-    .detail-card-body {
-        padding: 18px;
+    .btn-back-structure{
+        min-height:40px;
+        padding:9px 15px;
+        border-radius:12px;
+        border:1px solid rgba(255,255,255,.28);
+        background:rgba(255,255,255,.13);
+        color:#ffffff;
+        text-decoration:none;
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        font-size:13px;
+        font-weight:600;
+        transition:.18s ease;
     }
 
-    .info-table {
-        margin-bottom: 0;
+    .btn-back-structure:hover{
+        background:rgba(255,255,255,.22);
+        color:#ffffff;
+        transform:translateY(-1px);
     }
 
-    .info-table th {
-        width: 34%;
-        background: #f6f8f4;
-        color: #536044;
-        font-size: 13px;
-        vertical-align: middle;
+    .detail-summary-strip{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+        gap:1px;
+        overflow:hidden;
+        border:1px solid var(--sd-border);
+        border-radius:18px;
+        background:var(--sd-border);
+        margin-bottom:16px;
+        box-shadow:0 8px 22px rgba(15,23,42,.045);
     }
 
-    .info-table td {
-        color: #111827;
-        font-size: 13.5px;
-        vertical-align: middle;
-        font-weight: 600;
+    .summary-item{
+        background:#ffffff;
+        padding:16px 18px;
     }
 
-    .holder-card {
-        border: 1px solid #e5e7eb;
-        border-radius: 16px;
-        padding: 14px 16px;
-        margin-bottom: 10px;
-        background: #ffffff;
+    .summary-label{
+        color:var(--sd-muted);
+        font-size:12px;
+        margin-bottom:6px;
+        font-weight:700;
     }
 
-    .holder-name {
-        color: #273957;
-        font-weight: 900;
-        font-size: 15px;
-        margin-bottom: 4px;
+    .summary-value{
+        color:var(--sd-navy);
+        font-size:22px;
+        line-height:1.1;
+        font-weight:700;
     }
 
-    .holder-meta {
-        color: #6b7280;
-        font-size: 12.5px;
-        line-height: 1.6;
-        font-weight: 600;
+    .detail-content-panel{
+        background:#ffffff;
+        border:1px solid var(--sd-border);
+        border-radius:22px;
+        box-shadow:var(--sd-shadow);
+        overflow:hidden;
     }
 
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 999px;
-        padding: 5px 10px;
-        font-size: 11px;
-        font-weight: 800;
+    .detail-content-grid{
+        display:grid;
+        grid-template-columns:420px minmax(0, 1fr);
+        min-height:400px;
     }
 
-    .status-active {
-        background: #dcfce7;
-        color: #166534;
+    .detail-side{
+        border-right:1px solid var(--sd-border-soft);
+        background:#fbfcf8;
+        padding:22px;
     }
 
-    .status-history {
-        background: #eef2eb;
-        color: #536044;
+    .detail-main{
+        padding:22px;
     }
 
-    .table-history th {
-        background: #6b775c !important;
-        color: #ffffff;
-        font-size: 12.5px;
-        text-align: center;
-        vertical-align: middle;
+    .section-block + .section-block{
+        margin-top:28px;
+        padding-top:22px;
+        border-top:1px solid var(--sd-border-soft);
     }
 
-    .table-history td {
-        font-size: 13px;
-        vertical-align: middle;
+    .section-header{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        margin-bottom:14px;
     }
 
-    @media (max-width: 768px) {
-        .detail-hero {
-            padding: 22px 18px;
+    .section-title{
+        display:flex;
+        align-items:center;
+        gap:9px;
+        color:var(--sd-navy);
+        font-size:15px;
+        font-weight:700;
+        margin:0;
+    }
+
+    .section-title i{
+        color:var(--sd-olive-dark);
+        font-size:16px;
+    }
+
+    .status-pill{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:999px;
+        padding:6px 10px;
+        font-size:12px;
+        line-height:1;
+        font-weight:700;
+        white-space:nowrap;
+    }
+
+    .status-pill.filled,
+    .status-active{
+        color:#166534;
+        background:#dcfce7;
+        border:1px solid #bbf7d0;
+    }
+
+    .status-pill.vacant{
+        color:#92400e;
+        background:#fef3c7;
+        border:1px solid #fde68a;
+    }
+
+    .status-history{
+        color:#536044;
+        background:#eef2eb;
+        border:1px solid #d9e0d2;
+    }
+
+    .info-list{
+        display:grid;
+        gap:0;
+        border:1px solid var(--sd-border-soft);
+        border-radius:16px;
+        overflow:hidden;
+        background:#ffffff;
+    }
+
+    .info-row{
+        display:grid;
+        grid-template-columns:145px minmax(0, 1fr);
+        border-bottom:1px solid var(--sd-border-soft);
+    }
+
+    .info-row:last-child{
+        border-bottom:0;
+    }
+
+    .info-label,
+    .info-value{
+        padding:12px 13px;
+        font-size:13px;
+        line-height:1.45;
+    }
+
+    .info-label{
+        color:#667085;
+        background:#fbfcf8;
+        font-weight:400;
+    }
+
+    .info-value{
+        color:#1f2937;
+        font-weight:400;
+        word-break:break-word;
+    }
+
+    .holder-list{
+        display:grid;
+        gap:10px;
+    }
+
+    .holder-item{
+        display:grid;
+        grid-template-columns:minmax(0, 1fr) auto;
+        gap:12px;
+        padding:14px 15px;
+        border:1px solid var(--sd-border-soft);
+        border-radius:16px;
+        background:#ffffff;
+    }
+
+    .holder-name{
+        color:var(--sd-navy);
+        font-size:14px;
+        font-weight:600;
+        margin-bottom:3px;
+    }
+
+    .holder-nip{
+        color:var(--sd-muted);
+        font-size:12.5px;
+        margin-bottom:8px;
+    }
+
+    .holder-meta{
+        display:grid;
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+        gap:8px;
+        color:#667085;
+        font-size:12.5px;
+        line-height:1.45;
+    }
+
+    .holder-meta span{
+        color:#344054;
+    }
+
+    .empty-state{
+        border:1px dashed #d9e0d2;
+        background:#fffbeb;
+        color:#92400e;
+        border-radius:16px;
+        padding:16px;
+        display:flex;
+        gap:10px;
+        align-items:flex-start;
+        font-size:13px;
+        line-height:1.5;
+    }
+
+    .empty-state i{
+        margin-top:2px;
+    }
+
+    .table-history{
+        border-color:var(--sd-border-soft) !important;
+        margin-bottom:0;
+        font-size:13px;
+    }
+
+    .table-history th{
+        background:#6b775c !important;
+        color:#ffffff;
+        text-align:center;
+        vertical-align:middle;
+        border-color:rgba(255,255,255,.18) !important;
+        padding:11px 10px;
+        white-space:nowrap;
+        font-size:12px;
+        font-weight:600;
+    }
+
+    .table-history td{
+        color:#344054;
+        vertical-align:middle;
+        border-color:var(--sd-border-soft) !important;
+        padding:11px 10px;
+        font-weight:400;
+    }
+
+    .table-history tbody tr:hover td{
+        background:#fbfcf8;
+    }
+
+    @media (max-width: 1100px){
+        .detail-content-grid{
+            grid-template-columns:1fr;
         }
 
-        .detail-title {
-            font-size: 23px;
+        .detail-side{
+            border-right:0;
+            border-bottom:1px solid var(--sd-border-soft);
+        }
+    }
+
+    @media (max-width: 900px){
+        .detail-summary-strip{
+            grid-template-columns:1fr;
         }
 
-        .btn-back-structure {
-            width: 100%;
-            margin-top: 14px;
+        .holder-meta{
+            grid-template-columns:1fr;
+        }
+    }
+
+    @media (max-width: 768px){
+        .structure-detail-page{
+            padding:16px 12px 30px;
+        }
+
+        .detail-hero{
+            padding:21px 18px;
+            border-radius:18px;
+        }
+
+        .btn-back-structure{
+            width:100%;
+            justify-content:center;
+        }
+
+        .detail-side,
+        .detail-main{
+            padding:18px;
+        }
+
+        .info-row{
+            grid-template-columns:1fr;
+        }
+
+        .info-label{
+            padding-bottom:4px;
+        }
+
+        .info-value{
+            padding-top:4px;
+        }
+
+        .holder-item{
+            grid-template-columns:1fr;
         }
     }
 </style>
 
 <div class="container-fluid structure-detail-page">
-    <div class="detail-hero">
-        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-            <div>
-                <div class="detail-eyebrow">Structure Detail</div>
-                <h4 class="detail-title">{{ $namaJabatan }}</h4>
-                <p class="detail-subtitle">
-                    Detail parent jabatan, departemen, pemangku saat ini, dan riwayat pemangku jabatan.
-                </p>
-            </div>
+    <div class="structure-detail-shell">
 
-            <a href="{{ route('struktur-jabatan.index') }}" class="btn-back-structure">
-                Kembali ke Struktur
-            </a>
-        </div>
-    </div>
-
-    <div class="row g-4">
-        <div class="col-lg-5">
-            <div class="detail-card">
-                <div class="detail-card-header">
-                    Data Jabatan
+        <div class="detail-hero">
+            <div class="detail-hero-inner">
+                <div>
+                    <div class="detail-eyebrow">DETAIL JABATAN</div>
+                    <h4 class="detail-title">{{ $namaJabatan }}</h4>
                 </div>
 
-                <div class="detail-card-body">
-                    <table class="table table-bordered info-table">
-                        <tr>
-                            <th>Nama Jabatan</th>
-                            <td>{{ $namaJabatan }}</td>
-                        </tr>
-                        <tr>
-                            <th>Departemen</th>
-                            <td>{{ $namaDepartemen }}</td>
-                        </tr>
-                        <tr>
-                            <th>Parent Jabatan</th>
-                            <td>{{ $namaParent }}</td>
-                        </tr>
-                        <tr>
-                            <th>Golongan</th>
-                            <td>{{ $version->gol_jabatan ?? $jabatan->gol_jabatan ?? '-' }}</td>
-                        </tr>
-                        <tr>
-                            <th>Home Base</th>
-                            <td>{{ $version->home_base ?? $jabatan->home_base ?? '-' }}</td>
-                        </tr>
-                        <tr>
-                            <th>Lokasi Kerja</th>
-                            <td>{{ $version->lokasi_kerja ?? $jabatan->lokasi_kerja ?? '-' }}</td>
-                        </tr>
-                        <tr>
-                            <th>Versi Aktif</th>
-                            <td>{{ $version ? 'Versi '.$version->version_number : '-' }}</td>
-                        </tr>
-                    </table>
-                </div>
+                <a href="{{ route('struktur-jabatan.index') }}" class="btn-back-structure">
+                    <i class="bi bi-arrow-left"></i>
+                    <span>Kembali</span>
+                </a>
             </div>
         </div>
 
-        <div class="col-lg-7">
-            <div class="detail-card mb-4">
-                <div class="detail-card-header">
-                    Pemangku Jabatan Saat Ini
-                </div>
-
-                <div class="detail-card-body">
-                    @forelse($jabatan->pemangkuSaatIni as $pegawai)
-                        <div class="holder-card">
-                            <div class="holder-name">{{ $pegawai->nama }}</div>
-                            <div class="holder-meta">NIP: {{ $pegawai->nip }}</div>
-                            <div class="holder-meta">Departemen: {{ $pegawai->departemenMaster->nama_departemen ?? $pegawai->departemen ?? '-' }}</div>
-                            <div class="holder-meta">Status: {{ $pegawai->status ?? '-' }}</div>
-                        </div>
-                    @empty
-                        <div class="alert alert-warning mb-0 rounded-4">
-                            Belum ada pegawai aktif yang memegang jabatan ini.
-                        </div>
-                    @endforelse
-                </div>
+        <div class="detail-summary-strip">
+            <div class="summary-item">
+                <div class="summary-label">Status Formasi</div>
+                <div class="summary-value">{{ $isVacant ? 'Vacant' : 'Terisi' }}</div>
             </div>
 
-            <div class="detail-card">
-                <div class="detail-card-header">
-                    Riwayat Pemangku Jabatan
-                </div>
+            <div class="summary-item">
+                <div class="summary-label">Pemangku Aktif</div>
+                <div class="summary-value">{{ $jumlahPemangkuAktif }}</div>
+            </div>
 
-                <div class="detail-card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered align-middle table-history">
-                            <thead>
-                                <tr>
-                                    <th>Nama Pegawai</th>
-                                    <th>NIP</th>
-                                    <th>Versi JD</th>
-                                    <th>Mulai</th>
-                                    <th>Selesai</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
+            <div class="summary-item">
+                <div class="summary-label">Riwayat Pemangku</div>
+                <div class="summary-value">{{ $jumlahRiwayat }}</div>
+            </div>
+        </div>
 
-                            <tbody>
-                                @forelse($jabatan->riwayatPemangku as $riwayat)
-                                    <tr>
-                                        <td>{{ $riwayat->pegawai?->nama ?? '-' }}</td>
-                                        <td class="text-center">{{ $riwayat->nip }}</td>
-                                        <td class="text-center">{{ $riwayat->version ? 'Versi '.$riwayat->version->version_number : '-' }}</td>
-                                        <td class="text-center">
-                                            {{ $riwayat->assigned_at ? \Carbon\Carbon::parse($riwayat->assigned_at)->locale('id')->translatedFormat('d F Y') : '-' }}
-                                        </td>
-                                        <td class="text-center">
-                                            {{ $riwayat->ended_at ? \Carbon\Carbon::parse($riwayat->ended_at)->locale('id')->translatedFormat('d F Y') : '-' }}
-                                        </td>
-                                        <td class="text-center">
-                                            @if($riwayat->is_current)
-                                                <span class="status-badge status-active">Aktif</span>
-                                            @else
-                                                <span class="status-badge status-history">Riwayat</span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="6" class="text-center text-muted">
-                                            Belum ada riwayat pemangku jabatan.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
+        <div class="detail-content-panel">
+            <div class="detail-content-grid">
+
+                <aside class="detail-side">
+                    <div class="section-block">
+                        <div class="section-header">
+                            <h5 class="section-title">
+                                <i class="bi bi-diagram-3"></i>
+                                <span>Data Jabatan</span>
+                            </h5>
+
+                            <span class="status-pill {{ $isVacant ? 'vacant' : 'filled' }}">
+                                {{ $isVacant ? 'Vacant' : 'Terisi' }}
+                            </span>
+                        </div>
+
+                        <div class="info-list">
+                            <div class="info-row">
+                                <div class="info-label">Nama Jabatan</div>
+                                <div class="info-value">{{ $namaJabatan }}</div>
+                            </div>
+
+                            <div class="info-row">
+                                <div class="info-label">Departemen</div>
+                                <div class="info-value">{{ $namaDepartemen }}</div>
+                            </div>
+
+                            <div class="info-row">
+                                <div class="info-label">Parent Jabatan</div>
+                                <div class="info-value">{{ $namaParent }}</div>
+                            </div>
+
+                            <div class="info-row">
+                                <div class="info-label">Golongan</div>
+                                <div class="info-value">{{ $version->gol_jabatan ?? $jabatan->gol_jabatan ?? '-' }}</div>
+                            </div>
+
+                            <div class="info-row">
+                                <div class="info-label">Home Base</div>
+                                <div class="info-value">{{ $version->home_base ?? $jabatan->home_base ?? '-' }}</div>
+                            </div>
+
+                            <div class="info-row">
+                                <div class="info-label">Lokasi Kerja</div>
+                                <div class="info-value">{{ $version->lokasi_kerja ?? $jabatan->lokasi_kerja ?? '-' }}</div>
+                            </div>
+
+                            <div class="info-row">
+                                <div class="info-label">Versi Aktif</div>
+                                <div class="info-value">{{ $version ? 'Versi '.$version->version_number : '-' }}</div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </aside>
+
+                <main class="detail-main">
+                    <div class="section-block">
+                        <div class="section-header">
+                            <h5 class="section-title">
+                                <i class="bi bi-person-check"></i>
+                                <span>Pemangku Jabatan Saat Ini</span>
+                            </h5>
+
+                            <span class="status-pill {{ $isVacant ? 'vacant' : 'filled' }}">
+                                {{ $jumlahPemangkuAktif }} Pegawai
+                            </span>
+                        </div>
+
+                        @if($pemangkuAktif->count())
+                            <div class="holder-list">
+                                @foreach($pemangkuAktif as $pegawai)
+                                    <div class="holder-item">
+                                        <div>
+                                            <div class="holder-name">{{ $pegawai->nama }}</div>
+                                            <div class="holder-nip">NIP: {{ $pegawai->nip }}</div>
+
+                                            <div class="holder-meta">
+                                                <div>Departemen: <span>{{ $pegawai->departemenMaster->nama_departemen ?? $pegawai->departemen ?? '-' }}</span></div>
+                                                <div>Status: <span>{{ $pegawai->status ?? '-' }}</span></div>
+                                                <div>Lokasi: <span>{{ $pegawai->lokasi_kerja ?? '-' }}</span></div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <span class="status-pill status-active">Aktif</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="empty-state">
+                                <i class="bi bi-exclamation-circle"></i>
+                                <div>
+                                    Belum ada pegawai aktif yang memegang jabatan ini.
+                                    Posisi akan tampil sebagai vacant pada struktur organisasi.
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="section-block">
+                        <div class="section-header">
+                            <h5 class="section-title">
+                                <i class="bi bi-clock-history"></i>
+                                <span>Riwayat Pemangku Jabatan</span>
+                            </h5>
+
+                            <span class="status-pill filled">
+                                {{ $jumlahRiwayat }} Riwayat
+                            </span>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle table-history">
+                                <thead>
+                                    <tr>
+                                        <th>Nama Pegawai</th>
+                                        <th>NIP</th>
+                                        <th>Versi JD</th>
+                                        <th>Mulai</th>
+                                        <th>Selesai</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    @forelse($riwayatPemangku as $riwayat)
+                                        <tr>
+                                            <td>{{ $riwayat->pegawai?->nama ?? '-' }}</td>
+
+                                            <td class="text-center">
+                                                {{ $riwayat->nip }}
+                                            </td>
+
+                                            <td class="text-center">
+                                                {{ $riwayat->version ? 'Versi '.$riwayat->version->version_number : '-' }}
+                                            </td>
+
+                                            <td class="text-center">
+                                                {{ $riwayat->assigned_at ? \Carbon\Carbon::parse($riwayat->assigned_at)->locale('id')->translatedFormat('d F Y') : '-' }}
+                                            </td>
+
+                                            <td class="text-center">
+                                                {{ $riwayat->ended_at ? \Carbon\Carbon::parse($riwayat->ended_at)->locale('id')->translatedFormat('d F Y') : '-' }}
+                                            </td>
+
+                                            <td class="text-center">
+                                                @if($riwayat->is_current)
+                                                    <span class="status-pill status-active">Aktif</span>
+                                                @else
+                                                    <span class="status-pill status-history">Riwayat</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-4">
+                                                Belum ada riwayat pemangku jabatan.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </main>
+
             </div>
         </div>
+
     </div>
 </div>
 @endsection

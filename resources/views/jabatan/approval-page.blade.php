@@ -28,33 +28,47 @@
 
     /*
     |--------------------------------------------------------------------------
-    | Short Approval URL
+    | Short Link Approval
     |--------------------------------------------------------------------------
-    | Gunakan short link internal corporate.
-    | Jangan pakai layanan external shortener seperti bit.ly karena link approval
-    | adalah akses dokumen internal perusahaan.
+    | Prioritas:
+    | 1. Pakai $approvalUrl dari controller.
+    | 2. Jika $approvalUrl masih localhost/127.0.0.1, paksa pakai APP_APPROVAL_URL.
+    | 3. Path tetap pendek: /approval/jd/{token}
     |--------------------------------------------------------------------------
     */
-    $shortApprovalUrl = $approvalToken
-        ? route('jabatan.approval.short', ['token' => $approvalToken])
+
+    $baseApprovalUrl = config('app.approval_url')
+        ?: env('APP_APPROVAL_URL')
+        ?: config('app.url');
+
+    $approvalPath = $approvalToken
+        ? route('jabatan.approval.short', ['token' => $approvalToken], false)
         : null;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Kondisi link boleh tampil
-    |--------------------------------------------------------------------------
-    | Link hanya tampil jika:
-    | - Belum approved final
-    | - Belum menunggu final HCM
-    | - Masih ada pending version
-    | - Token tersedia
-    |--------------------------------------------------------------------------
-    */
+    $shortApprovalUrl = $approvalUrl ?? null;
+
+    $isBadLocalUrl = $shortApprovalUrl
+        && (
+            str_contains($shortApprovalUrl, '127.0.0.1')
+            || str_contains($shortApprovalUrl, 'localhost')
+        );
+
+    if ((!$shortApprovalUrl || $isBadLocalUrl) && $approvalToken && $baseApprovalUrl && $approvalPath) {
+        $shortApprovalUrl = rtrim((string) $baseApprovalUrl, '/') . $approvalPath;
+    }
+
+    $isLocalApprovalUrl = $shortApprovalUrl
+        && (
+            str_contains($shortApprovalUrl, '127.0.0.1')
+            || str_contains($shortApprovalUrl, 'localhost')
+        );
+
     $canShowApprovalLink =
         !$jabatan->is_approval_final
         && !$jabatan->is_waiting_hcm_final
         && !empty($approvalToken)
-        && !empty($pendingVersion);
+        && !empty($pendingVersion)
+        && !empty($shortApprovalUrl);
 @endphp
 
 <div class="approval-panel">
@@ -102,9 +116,9 @@
 
         @if(!empty($isLocalApprovalUrl))
             <div class="approval-alert warning">
-                Link approval masih memakai alamat lokal/private. Link hanya bisa dibuka
-                dari perangkat pada jaringan yang sama. Untuk penggunaan corporate lintas
-                jaringan, gunakan domain internal/VPN dan set <strong>APP_APPROVAL_URL</strong>.
+                Link approval masih memakai alamat lokal/private, sehingga tidak bisa dibuka dari handphone.
+                Pastikan <strong>APP_APPROVAL_URL</strong> mengarah ke domain ngrok, lalu jalankan
+                <strong>php artisan config:clear</strong>.
             </div>
         @endif
 
@@ -232,10 +246,11 @@
 
                         <div style="margin-top:10px; max-width:920px;">
                             <small style="color:#667085; font-weight:700;">
-                                Format link:
+                                Link yang akan dicopy:
                             </small>
-                            <code style="display:inline-block; margin-top:4px; background:#f3f4f6; padding:6px 9px; border-radius:8px; color:#344054;">
-                                /approval/jd/{{ $approvalToken }}
+
+                            <code style="display:block; margin-top:4px; background:#f3f4f6; padding:8px 10px; border-radius:8px; color:#344054; white-space:normal; word-break:break-all;">
+                                {{ $shortApprovalUrl }}
                             </code>
                         </div>
                     @elseif($jabatan->is_approval_final)
@@ -328,7 +343,8 @@ function copyApprovalLink(){
             },
             body: JSON.stringify({
                 source: 'copy_short_link',
-                url_type: 'short'
+                url_type: 'short',
+                copied_url: link
             })
         }).finally(function(){
             alert('Short link approval berhasil disalin dan aktivitas copy link sudah dicatat.');

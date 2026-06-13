@@ -529,49 +529,28 @@ class JabatanController extends Controller
     }
 
     public function approvalPage(Jabatan $jabatan)
-    {
-        abort_unless(auth()->check() && in_array(auth()->user()->role, ['admin', 'hcm'], true), 403);
+{
+    abort_unless(auth()->check() && in_array(auth()->user()->role, ['admin', 'hcm'], true), 403);
 
-        $jabatan->load(['activeVersion', 'pendingVersion']);
+    $jabatan = $this->ensureApprovalToken($jabatan);
 
-        if (!$jabatan->is_approval_final && !$jabatan->is_waiting_hcm_final) {
-            $jabatan = $this->ensureApprovalToken($jabatan);
-        }
+    $jabatan->load([
+        'activeVersion',
+        'pendingVersion',
+        'approvalLogs',
+    ]);
 
-        $jabatan->load([
-            'approvalLogs' => function ($query) use ($jabatan) {
-                $query->where('id_jabatan', $jabatan->id_jabatan)
-                    ->with('version')
-                    ->orderByDesc('created_at')
-                    ->orderByDesc('id_jabatan_approval_log');
-            },
-        ]);
+    $approvalUrl = $this->buildApprovalUrl($jabatan);
+    $isLocalApprovalUrl = $this->isLocalApprovalUrl($approvalUrl);
 
-        $approvalUrl = $jabatan->approval_token
-            ? $this->buildApprovalUrl($jabatan)
-            : null;
+    $this->recordApprovalLog($jabatan, 'approval_page_opened');
 
-        $isLocalApprovalUrl = $approvalUrl ? $this->isLocalApprovalUrl($approvalUrl) : false;
-
-        $this->recordApprovalLog($jabatan, 'approval_page_opened', [
-            'id_jabatan_version' => $jabatan->draft_version_id,
-            'metadata' => [
-                'scope' => 'single_jabatan',
-                'id_jabatan' => $jabatan->id_jabatan,
-            ],
-        ]);
-
-        $jabatan->load([
-            'approvalLogs' => function ($query) use ($jabatan) {
-                $query->where('id_jabatan', $jabatan->id_jabatan)
-                    ->with('version')
-                    ->orderByDesc('created_at')
-                    ->orderByDesc('id_jabatan_approval_log');
-            },
-        ]);
-
-        return view('jabatan.approval-page', compact('jabatan', 'approvalUrl', 'isLocalApprovalUrl'));
-    }
+    return view('jabatan.approval-page', compact(
+        'jabatan',
+        'approvalUrl',
+        'isLocalApprovalUrl'
+    ));
+}
 
     public function approvalQr(Jabatan $jabatan)
     {
@@ -632,19 +611,19 @@ class JabatanController extends Controller
     }
 
     private function buildApprovalUrl(Jabatan $jabatan): string
-    {
-        $approvalPath = route('jabatan.approval.scan', [
-            'jabatan' => $jabatan->id_jabatan,
-            'token' => $jabatan->approval_token,
-        ], false);
+{
+    $jabatan = $this->ensureApprovalToken($jabatan);
 
-        $baseUrl = config('app.approval_url')
-            ?: env('APP_APPROVAL_URL')
-            ?: config('app.url')
-            ?: request()->getSchemeAndHttpHost();
+    $approvalPath = route('jabatan.approval.short', [
+        'token' => $jabatan->approval_token,
+    ], false);
 
-        return rtrim((string) $baseUrl, '/') . $approvalPath;
-    }
+    $baseUrl = config('app.approval_url')
+        ?: config('app.url')
+        ?: request()->getSchemeAndHttpHost();
+
+    return rtrim((string) $baseUrl, '/') . $approvalPath;
+}
 
     private function isLocalApprovalUrl(string $url): bool
     {

@@ -115,7 +115,7 @@ class StrukturJabatanController extends Controller
 
     public function show($id_jabatan)
     {
-        abort_unless(auth()->check() && in_array(auth()->user()->role, ['hcm', 'admin'], true), 403);
+        abort_unless(auth()->check(), 403);
 
         $jabatan = Jabatan::query()
             ->with([

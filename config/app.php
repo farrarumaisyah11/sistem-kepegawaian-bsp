@@ -53,6 +53,7 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
+    'approval_url' => env('APP_APPROVAL_URL', env('APP_URL', 'http://localhost')),
 
     /*
     |--------------------------------------------------------------------------
