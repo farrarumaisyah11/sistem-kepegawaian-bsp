@@ -5,8 +5,10 @@
 @section('content')
 @php
     \Carbon\Carbon::setLocale('id');
+
     $pengajuanAktif = $pengajuanAktif ?? collect();
     $riwayatPengajuan = $riwayatPengajuan ?? collect();
+    $currentRole = auth()->user()->role ?? '';
 
     $totalBaru = $pengajuanAktif->whereIn('status', ['diajukan', 'pending', 'belum_diolah'])->count();
     $totalDiproses = $pengajuanAktif->where('status', 'diproses')->count();
@@ -36,9 +38,6 @@
             <div>
                 <div class="eyebrow">APPROVAL</div>
                 <h2 class="page-title">Pengajuan Perubahan</h2>
-                <p class="page-subtitle mb-0">
-                    Kelola pengajuan perubahan data pegawai. Data baru akan masuk ke draft terlebih dahulu dan baru diterapkan ke tabel utama setelah disetujui.
-                </p>
             </div>
         </div>
     </div>
@@ -73,9 +72,6 @@
             <div class="table-title-wrap mb-3">
                 <div>
                     <h5 class="table-title mb-1">Data Pengajuan</h5>
-                    <p class="table-subtitle mb-0">
-                        Pengajuan aktif dipisahkan dari riwayat agar data lebih rapi dan mudah dipantau.
-                    </p>
                 </div>
             </div>
 
@@ -144,6 +140,10 @@
                                             'ditolak' => 'badge-reject',
                                             default => 'badge-default',
                                         };
+
+                                        $createdAtWib = $item->created_at
+                                            ? \Illuminate\Support\Carbon::parse($item->created_at)->timezone('Asia/Jakarta')->locale('id')
+                                            : null;
                                     @endphp
 
                                     <tr>
@@ -163,12 +163,6 @@
                                             </span>
                                         </td>
 
-                                        @php
-                                            $createdAtWib = $item->created_at
-                                                ? \Illuminate\Support\Carbon::parse($item->created_at)->timezone('Asia/Jakarta')->locale('id')
-                                                : null;
-                                        @endphp
-
                                         <td class="text-center" data-order="{{ $createdAtWib ? $createdAtWib->format('YmdHis') : '' }}">
                                             <div class="date-main">{{ $createdAtWib ? $createdAtWib->translatedFormat('d F Y') : '-' }}</div>
                                             <div class="date-sub">{{ $createdAtWib ? $createdAtWib->format('H:i') . ' WIB' : '--:-- WIB' }}</div>
@@ -176,7 +170,7 @@
 
                                         <td class="text-center">
                                             <div class="action-group">
-                                                <a href="{{ route(auth()->user()->role.'.pengajuan.show', $item) }}"
+                                                <a href="{{ route($currentRole.'.pengajuan.show', $item) }}"
                                                    class="icon-btn icon-view"
                                                    title="Lihat Detail"
                                                    aria-label="Lihat Detail">
@@ -186,7 +180,7 @@
                                                     </svg>
                                                 </a>
 
-                                                <form action="{{ route(auth()->user()->role.'.pengajuan.destroy', $item) }}"
+                                                <form action="{{ route($currentRole.'.pengajuan.destroy', $item) }}"
                                                       method="POST"
                                                       class="delete-form d-inline"
                                                       data-nip="{{ $item->nip }}"
@@ -248,6 +242,10 @@
                                             'ditolak' => 'badge-reject',
                                             default => 'badge-default',
                                         };
+
+                                        $createdAtWib = $item->created_at
+                                            ? \Illuminate\Support\Carbon::parse($item->created_at)->timezone('Asia/Jakarta')->locale('id')
+                                            : null;
                                     @endphp
 
                                     <tr>
@@ -267,12 +265,6 @@
                                             </span>
                                         </td>
 
-                                        @php
-                                            $createdAtWib = $item->created_at
-                                                ? \Illuminate\Support\Carbon::parse($item->created_at)->timezone('Asia/Jakarta')->locale('id')
-                                                : null;
-                                        @endphp
-
                                         <td class="text-center" data-order="{{ $createdAtWib ? $createdAtWib->format('YmdHis') : '' }}">
                                             <div class="date-main">{{ $createdAtWib ? $createdAtWib->translatedFormat('d F Y') : '-' }}</div>
                                             <div class="date-sub">{{ $createdAtWib ? $createdAtWib->format('H:i') . ' WIB' : '--:-- WIB' }}</div>
@@ -280,7 +272,7 @@
 
                                         <td class="text-center">
                                             <div class="action-group">
-                                                <a href="{{ route(auth()->user()->role.'.pengajuan.show', $item) }}"
+                                                <a href="{{ route($currentRole.'.pengajuan.show', $item) }}"
                                                    class="icon-btn icon-view"
                                                    title="Lihat Detail"
                                                    aria-label="Lihat Detail">
@@ -290,27 +282,29 @@
                                                     </svg>
                                                 </a>
 
-                                                <form action="{{ route(auth()->user()->role.'.pengajuan.destroy', $item) }}"
-                                                      method="POST"
-                                                      class="delete-form d-inline"
-                                                      data-nip="{{ $item->nip }}"
-                                                      data-nama="{{ $nama }}">
-                                                    @csrf
-                                                    @method('DELETE')
+                                                @if($currentRole === 'hcm')
+                                                    <form action="{{ route($currentRole.'.pengajuan.destroy', $item) }}"
+                                                          method="POST"
+                                                          class="delete-form d-inline"
+                                                          data-nip="{{ $item->nip }}"
+                                                          data-nama="{{ $nama }}">
+                                                        @csrf
+                                                        @method('DELETE')
 
-                                                    <button type="submit"
-                                                            class="icon-btn icon-delete"
-                                                            title="Hapus Pengajuan"
-                                                            aria-label="Hapus Pengajuan">
-                                                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                                            <path d="M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                                            <path d="M10 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                                            <path d="M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                                                            <path d="M6 7l1 14h10l1-14" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                                                            <path d="M9 7V4h6v3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                                                        </svg>
-                                                    </button>
-                                                </form>
+                                                        <button type="submit"
+                                                                class="icon-btn icon-delete"
+                                                                title="Hapus Pengajuan"
+                                                                aria-label="Hapus Pengajuan">
+                                                            <svg class="action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                                <path d="M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                                                <path d="M10 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                                                <path d="M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                                                <path d="M6 7l1 14h10l1-14" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                                                <path d="M9 7V4h6v3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -549,7 +543,6 @@
         letter-spacing: .02em;
     }
 
-    /* Status dibuat lebih berbeda agar mudah dibaca */
     .badge-pending {
         background: #e8eef5;
         color: #273957;
@@ -622,7 +615,6 @@
         color: #fff;
     }
 
-    /* Icon aksi lihat detail disamakan dengan view jabatan */
     .icon-view {
         background: #332da1 !important;
     }
@@ -789,7 +781,6 @@
             margin-top: 6px;
         }
     }
-    
 </style>
 @endpush
 

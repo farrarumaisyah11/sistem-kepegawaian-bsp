@@ -14,6 +14,15 @@
         --sidebar-current-width: var(--sidebar-mini);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Sidebar smooth background rail
+    |--------------------------------------------------------------------------
+    | Rail dibuat sebagai background panjang halaman.
+    | Gradient disamakan dengan sidebar fixed agar tidak muncul garis/patahan
+    | ketika screenshot full page.
+    |--------------------------------------------------------------------------
+    */
     .sidebar-page-rail {
         position: absolute;
         top: 0;
@@ -21,7 +30,13 @@
         width: var(--sidebar-current-width);
         height: var(--sidebar-page-height, 100vh);
         min-height: 100vh;
-        background: linear-gradient(180deg, var(--olive-700), var(--olive-950));
+        background:
+            linear-gradient(
+                180deg,
+                var(--olive-700) 0,
+                var(--olive-950) 100dvh,
+                var(--olive-950) 100%
+            );
         z-index: 10;
         pointer-events: none;
         transition: var(--transition);
@@ -30,16 +45,60 @@
     .sidebar {
         width: var(--sidebar-width);
         height: 100dvh;
+        min-height: 100dvh;
         position: fixed;
         top: 0;
         left: 0;
         z-index: 1300;
-        background: linear-gradient(180deg, var(--olive-700), var(--olive-950));
+        background:
+            linear-gradient(
+                180deg,
+                var(--olive-700) 0,
+                var(--olive-950) 100%
+            );
         transition: var(--transition);
         display: flex;
         flex-direction: column;
-        box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+        box-shadow: none;
         overflow: visible;
+        isolation: isolate;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Side shadow hanya arah kanan
+    |--------------------------------------------------------------------------
+    | Mengganti box-shadow default agar tidak muncul bayangan horizontal
+    | di bagian bawah sidebar saat screenshot full page.
+    |--------------------------------------------------------------------------
+    */
+    .sidebar::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: -14px;
+        width: 14px;
+        height: 100%;
+        background: linear-gradient(
+            90deg,
+            rgba(15,23,42,.14) 0%,
+            rgba(15,23,42,.055) 45%,
+            rgba(15,23,42,0) 100%
+        );
+        pointer-events: none;
+        z-index: 0;
+    }
+
+    .sidebar::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 1px;
+        height: 100%;
+        background: rgba(255,255,255,.06);
+        pointer-events: none;
+        z-index: 1;
     }
 
     .brand-box {
@@ -545,6 +604,8 @@
                     <i class="bi bi-list-check"></i>
                     <span class="nav-txt">Daftar Jabatan</span>
                 </a>
+
+                <div class="menu-section">Layanan</div>
 
                 <a href="{{ route('struktur-jabatan.index') }}"
                    class="menu-link {{ request()->routeIs('struktur-jabatan.*') ? 'active' : '' }}"

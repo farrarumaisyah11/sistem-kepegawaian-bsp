@@ -367,7 +367,7 @@
     .section-eyebrow {
         color: #6b775c;
         font-size: 11px;
-        font-weight: 800;
+        font-weight: 700;
         letter-spacing: 2px;
         margin-bottom: 8px;
         text-transform: uppercase;
@@ -376,7 +376,7 @@
     .page-title {
         color: #3f4a32;
         font-size: 31px;
-        font-weight: 800;
+        font-weight: 700;
         letter-spacing: -.3px;
         margin-bottom: 8px;
     }
@@ -386,6 +386,7 @@
         font-size: 14px;
         line-height: 1.65;
         max-width: 850px;
+        font-weight: 400;
     }
 
     .btn-back {
@@ -396,7 +397,7 @@
         border: 1px solid #dfe5d8;
         color: #536044;
         text-decoration: none;
-        font-weight: 800;
+        font-weight: 600;
         display: inline-flex;
         align-items: center;
         gap: 7px;
@@ -445,7 +446,7 @@
     .summary-label {
         color: #536044;
         font-size: 11px;
-        font-weight: 900;
+        font-weight: 700;
         text-transform: uppercase;
         letter-spacing: .08em;
         margin-bottom: 10px;
@@ -453,15 +454,15 @@
 
     .summary-value {
         color: #1f2937;
-        font-size: 23px;
-        font-weight: 900;
-        line-height: 1.15;
+        font-size: 21px;
+        font-weight: 500;
+        line-height: 1.25;
     }
 
     .summary-note {
         color: #6b7280;
         font-size: 12.5px;
-        font-weight: 600;
+        font-weight: 400;
         line-height: 1.55;
     }
 
@@ -469,12 +470,12 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 38px;
-        padding: 9px 16px;
+        min-height: 36px;
+        padding: 8px 15px;
         border-radius: 999px;
-        font-size: 13px;
-        font-weight: 900;
-        letter-spacing: .04em;
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: .035em;
         text-transform: uppercase;
     }
 
@@ -545,7 +546,7 @@
     .flow-title {
         color: #3f4a32;
         font-size: 13px;
-        font-weight: 900;
+        font-weight: 600;
     }
 
     .flow-desc {
@@ -553,6 +554,7 @@
         font-size: 12px;
         margin-top: 2px;
         white-space: nowrap;
+        font-weight: 400;
     }
 
     .flow-line {
@@ -575,13 +577,14 @@
     .note-title {
         color: #3f4a32;
         font-size: 14px;
-        font-weight: 900;
+        font-weight: 700;
         margin-bottom: 7px;
     }
 
     .note-text {
         color: #374151;
         font-size: 14px;
+        font-weight: 400;
         line-height: 1.65;
         white-space: pre-line;
     }
@@ -600,13 +603,14 @@
     .detail-title {
         color: #3f4a32;
         font-size: 18px;
-        font-weight: 900;
+        font-weight: 700;
         margin-bottom: 5px;
     }
 
     .detail-subtitle {
         color: #6b7280;
         font-size: 13px;
+        font-weight: 400;
         line-height: 1.55;
     }
 
@@ -637,7 +641,7 @@
     .section-title {
         color: #3f4a32;
         font-size: 17px;
-        font-weight: 900;
+        font-weight: 700;
         margin-bottom: 0;
     }
 
@@ -661,7 +665,7 @@
         background: #eef2eb;
         color: #536044;
         font-size: 12px;
-        font-weight: 900;
+        font-weight: 600;
         margin-bottom: 10px;
     }
 
@@ -676,7 +680,7 @@
         color: #ffffff;
         border-color: rgba(255,255,255,.12);
         font-size: 12px;
-        font-weight: 800;
+        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: .05em;
         padding: 12px 14px;
@@ -688,17 +692,18 @@
         padding: 12px 14px;
         vertical-align: top;
         font-size: 13.5px;
+        font-weight: 400;
     }
 
     .field-name {
         color: #374151;
-        font-weight: 800;
+        font-weight: 500;
         background: #fbfcfa;
     }
 
     .value-new {
         color: #3f4a32;
-        font-weight: 800;
+        font-weight: 400;
         word-break: break-word;
     }
 
@@ -708,7 +713,7 @@
         border: 1px dashed #d8ded1;
         border-radius: 18px;
         color: #6b7280;
-        font-weight: 700;
+        font-weight: 500;
         text-align: center;
     }
 
@@ -748,6 +753,5 @@
             padding: 16px;
         }
     }
-    
 </style>
 @endpush

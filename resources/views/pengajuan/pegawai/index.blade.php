@@ -35,9 +35,7 @@
             <div>
                 <div class="eyebrow">RIWAYAT PENGAJUAN</div>
                 <h2 class="page-title">Pengajuan Perubahan Data</h2>
-                <p class="page-subtitle mb-0">
-                    Kelola riwayat permintaan perubahan data pegawai Anda dengan tabel yang rapi, searchable, sortable, dan responsive.
-                </p>
+                
             </div>
 
             <a href="{{ route('pegawai.pengajuan.create') }}" class="btn-add">
@@ -52,9 +50,7 @@
             <div class="table-title-wrap">
                 <div>
                     <h5 class="table-title mb-1">Riwayat Pengajuan</h5>
-                    <p class="table-subtitle mb-0">
-                        Gunakan search bawaan DataTables untuk mencari status, tanggal, atau rincian perubahan.
-                    </p>
+                    
                 </div>
             </div>
 

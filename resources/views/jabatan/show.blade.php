@@ -2485,6 +2485,117 @@ body.jd-exporting-a4 #jabatan-export-root{
         display:none !important;
     }
 }
+
+
+/* =========================================================
+   A4 TYPOGRAPHY REFINEMENT
+   Fokus perubahan:
+   - Judul halaman, judul section, dan judul card tetap bold.
+   - Label/variabel tabel dibuat lebih ringan.
+   - Isi/data dibuat text biasa agar A4 lebih clean dan corporate.
+   - Berlaku untuk tampilan A4 dan hasil export/print.
+   ========================================================= */
+.jd-paper-a4,
+.jd-export-root{
+    font-weight:400 !important;
+}
+
+.jd-paper-a4 .jd-title,
+.jd-export-root .jd-title,
+.jd-paper-a4 .jd-company-name,
+.jd-export-root .jd-company-name,
+.jd-paper-a4 .jd-profile-card h2,
+.jd-export-root .jd-profile-card h2,
+.jd-paper-a4 .jd-section-heading,
+.jd-export-root .jd-section-heading,
+.jd-paper-a4 .jd-card-title,
+.jd-export-root .jd-card-title{
+    font-weight:700 !important;
+}
+
+.jd-paper-a4 .jd-company-unit,
+.jd-export-root .jd-company-unit,
+.jd-paper-a4 .jd-profile-badge,
+.jd-export-root .jd-profile-badge,
+.jd-paper-a4 .jd-signoff-label,
+.jd-export-root .jd-signoff-label,
+.jd-paper-a4 .jd-approval-summary-title,
+.jd-export-root .jd-approval-summary-title,
+.jd-paper-a4 .jd-signoff-status,
+.jd-export-root .jd-signoff-status,
+.jd-paper-a4 .jd-approval-badge,
+.jd-export-root .jd-approval-badge,
+.jd-paper-a4 .jd-approval-mini,
+.jd-export-root .jd-approval-mini{
+    font-weight:650 !important;
+}
+
+.jd-paper-a4 .jd-subtitle,
+.jd-export-root .jd-subtitle,
+.jd-paper-a4 .jd-company-address,
+.jd-export-root .jd-company-address,
+.jd-paper-a4 .jd-company-contact,
+.jd-export-root .jd-company-contact,
+.jd-paper-a4 .jd-profile-meta,
+.jd-export-root .jd-profile-meta,
+.jd-paper-a4 .jd-chip,
+.jd-export-root .jd-chip,
+.jd-paper-a4 .jd-profile-approval-text,
+.jd-export-root .jd-profile-approval-text,
+.jd-paper-a4 .jd-approval-summary-desc,
+.jd-export-root .jd-approval-summary-desc,
+.jd-paper-a4 .jd-text-block,
+.jd-export-root .jd-text-block,
+.jd-paper-a4 .jd-text-inside,
+.jd-export-root .jd-text-inside,
+.jd-paper-a4 .jd-list,
+.jd-export-root .jd-list,
+.jd-paper-a4 .jd-signoff-meta,
+.jd-export-root .jd-signoff-meta,
+.jd-paper-a4 .jd-footer-system-note,
+.jd-export-root .jd-footer-system-note{
+    font-weight:400 !important;
+}
+
+.jd-paper-a4 .jd-profile-meta strong,
+.jd-export-root .jd-profile-meta strong,
+.jd-paper-a4 .jd-profile-approval-text strong,
+.jd-export-root .jd-profile-approval-text strong,
+.jd-paper-a4 .jd-signoff-meta strong,
+.jd-export-root .jd-signoff-meta strong{
+    font-weight:600 !important;
+}
+
+.jd-paper-a4 .jd-meta-table th,
+.jd-export-root .jd-meta-table th,
+.jd-paper-a4 .jd-info-table th,
+.jd-export-root .jd-info-table th,
+.jd-paper-a4 .jd-approval-table th,
+.jd-export-root .jd-approval-table th{
+    font-weight:500 !important;
+    color:#475467 !important;
+}
+
+.jd-paper-a4 .jd-meta-table td,
+.jd-export-root .jd-meta-table td,
+.jd-paper-a4 .jd-info-table td,
+.jd-export-root .jd-info-table td,
+.jd-paper-a4 .jd-approval-table td,
+.jd-export-root .jd-approval-table td{
+    font-weight:400 !important;
+    color:#111827 !important;
+}
+
+.jd-paper-a4 .jd-list li,
+.jd-export-root .jd-list li{
+    font-weight:400 !important;
+}
+
+.jd-paper-a4 .jd-empty-box h4,
+.jd-export-root .jd-empty-box h4{
+    font-weight:700 !important;
+}
+
 </style>
 
 @if(!$jabatanNotFound)
