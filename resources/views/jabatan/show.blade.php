@@ -286,7 +286,8 @@
                             <div class="jd-modal-eyebrow">Audit Trail</div>
                             <h5 class="jd-modal-title" id="approvalLogModalTitle">Riwayat Approval Jabatan Ini</h5>
                             <div class="jd-modal-subtitle">
-                                Log berikut hanya milik jabatan <strong>{{ $j->nama_jabatan ?? '-' }}</strong>, bukan gabungan seluruh jabatan.
+                                Log aktivitas ini hanya milik jabatan <strong>{{ $j->nama_jabatan ?? '-' }}</strong>
+                                dari departemen <strong>{{ $j->departemen ?? '-' }}</strong>, bukan gabungan seluruh jabatan.
                             </div>
                         </div>
 
@@ -299,11 +300,6 @@
                         <div class="jd-audit-count">{{ $approvalLogs->count() }} aktivitas</div>
 
                         <div class="jd-modal-toolbar-actions">
-                            <button type="button" class="btn btn-outline-primary jd-btn jd-btn-sm" id="downloadApprovalLogPdfBtn">
-                                <i class="bi bi-file-earmark-pdf"></i>
-                                <span>Download PDF Log</span>
-                            </button>
-
                             <button type="button" class="btn btn-outline-success jd-btn jd-btn-sm" id="downloadApprovalLogCsvBtn">
                                 <i class="bi bi-filetype-csv"></i>
                                 <span>Download CSV</span>
@@ -356,68 +352,6 @@
                 </div>
             </div>
 
-            <div class="jd-log-export-area" id="approvalLogExportArea" aria-hidden="true">
-                <div class="jd-log-export-page">
-                    <div class="jd-log-export-header jd-avoid-break">
-                        <div>
-                            <div class="jd-log-export-company">PT. Bumi Siak Pusako</div>
-                            <div class="jd-log-export-title">Riwayat Approval Job Description</div>
-                            <div class="jd-log-export-subtitle">
-                                Jabatan: {{ $j->nama_jabatan ?? '-' }} · Departemen: {{ $j->departemen ?? '-' }}
-                            </div>
-                        </div>
-
-                        <div class="jd-log-export-status">
-                            Status<br>
-                            <strong>{{ $approvalStatusText }}</strong><br>
-                            <span>Dicetak: {{ now()->locale('id')->translatedFormat('d F Y H:i') }}</span>
-                        </div>
-                    </div>
-
-                    <div class="jd-log-export-summary jd-avoid-break">
-                        <div><strong>Versi Aktif:</strong> {{ $activeVersionLabel }}</div>
-                        <div><strong>Versi Pending:</strong> {{ $pendingVersionLabel }}</div>
-                        <div><strong>Total Aktivitas:</strong> {{ $approvalLogs->count() }}</div>
-                    </div>
-
-                    <div class="jd-log-export-list">
-                        @forelse($approvalLogs as $log)
-                            <div class="jd-log-export-item jd-avoid-break">
-                                <div class="jd-log-export-item-top">
-                                    <strong>{{ $log->action_label ?? '-' }}</strong>
-                                    <span>{{ $formatTanggalApprovalLog($log->created_at) }}</span>
-                                </div>
-                                <table>
-                                    <tr>
-                                        <th>Pengguna</th>
-                                        <td>{{ $log->actor_name ?? '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Role</th>
-                                        <td>{{ strtoupper($log->actor_role ?? '-') }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Jabatan</th>
-                                        <td>{{ $log->actor_jabatan ?? '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Departemen</th>
-                                        <td>{{ $log->actor_departemen ?? '-' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Versi</th>
-                                        <td>{{ $log->version ? 'Versi '.$log->version->version_number : '-' }}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        @empty
-                            <div class="jd-log-export-item jd-avoid-break">
-                                Belum ada riwayat approval untuk jabatan ini.
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-            </div>
         </div>
     @endif
 
@@ -2983,84 +2917,6 @@ body.jd-exporting-a4 #jabatan-export-root{
             URL.revokeObjectURL(url);
         }
 
-        function makeLogPdfVisible(area) {
-            if (!area) return;
-            area.removeAttribute('aria-hidden');
-            area.style.display = 'block';
-            area.style.position = 'fixed';
-            area.style.left = '0';
-            area.style.top = '0';
-            area.style.width = '210mm';
-            area.style.maxWidth = '210mm';
-            area.style.minWidth = '210mm';
-            area.style.height = 'auto';
-            area.style.zIndex = '999999';
-            area.style.visibility = 'visible';
-            area.style.opacity = '1';
-            area.style.pointerEvents = 'none';
-            area.style.background = '#ffffff';
-            area.style.transform = 'none';
-            area.style.overflow = 'visible';
-        }
-
-        function hideLogPdf(area) {
-            if (!area) return;
-            area.setAttribute('aria-hidden', 'true');
-            area.style.position = 'fixed';
-            area.style.left = '-99999px';
-            area.style.top = '0';
-            area.style.zIndex = '-1';
-            area.style.visibility = 'hidden';
-            area.style.pointerEvents = 'none';
-        }
-
-        function downloadApprovalLogPdf(button) {
-            const area = document.getElementById('approvalLogExportArea');
-            if (!area) return;
-
-            const originalText = button ? button.innerHTML : '';
-            if (button) {
-                button.disabled = true;
-                button.innerHTML = '<i class="bi bi-hourglass-split"></i> Menyiapkan PDF...';
-            }
-
-            ensureHtml2PdfLibrary()
-                .then(function () {
-                    makeLogPdfVisible(area);
-                    return waitForFonts().then(function () { return waitForImages(area); });
-                })
-                .then(function () {
-                    const opt = {
-                        margin: 0,
-                        filename: 'riwayat-approval-jabatan-{{ $j->id_jabatan }}-{{ \Illuminate\Support\Str::slug($j->nama_jabatan ?? "jabatan") }}.pdf',
-                        image: { type: 'jpeg', quality: 1 },
-                        html2canvas: {
-                            scale: 2.2,
-                            useCORS: true,
-                            allowTaint: true,
-                            backgroundColor: '#ffffff',
-                            scrollX: 0,
-                            scrollY: 0,
-                            windowWidth: area.scrollWidth,
-                            windowHeight: area.scrollHeight
-                        },
-                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-                        pagebreak: { mode: ['css', 'legacy'], avoid: ['.jd-avoid-break', '.jd-log-export-item'] }
-                    };
-                    return html2pdf().set(opt).from(area).save();
-                })
-                .then(function () {
-                    hideLogPdf(area);
-                    if (button) { button.disabled = false; button.innerHTML = originalText; }
-                })
-                .catch(function (error) {
-                    hideLogPdf(area);
-                    if (button) { button.disabled = false; button.innerHTML = originalText; }
-                    alert('Gagal membuat PDF log. Pastikan file public/vendor/html2pdf/html2pdf.bundle.min.js sudah ada, lalu refresh halaman.');
-                    console.error(error);
-                });
-        }
-
         window.printJabatanA4 = function () {
             const root = buildJabatanExportPages();
             if (!root) {
@@ -3161,10 +3017,6 @@ body.jd-exporting-a4 #jabatan-export-root{
             const downloadLogCsvBtn = document.getElementById('downloadApprovalLogCsvBtn');
             if (downloadLogCsvBtn) downloadLogCsvBtn.addEventListener('click', downloadApprovalLogCsv);
 
-            const downloadLogPdfBtn = document.getElementById('downloadApprovalLogPdfBtn');
-            if (downloadLogPdfBtn) {
-                downloadLogPdfBtn.addEventListener('click', function () { downloadApprovalLogPdf(downloadLogPdfBtn); });
-            }
 
             const downloadBtn = document.getElementById('downloadPdfBtn');
             if (downloadBtn) {

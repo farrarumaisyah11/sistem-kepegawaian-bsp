@@ -30,10 +30,9 @@
     |--------------------------------------------------------------------------
     | Short Link Approval
     |--------------------------------------------------------------------------
-    | Prioritas:
-    | 1. Pakai $approvalUrl dari controller.
-    | 2. Jika $approvalUrl masih localhost/127.0.0.1, paksa pakai APP_APPROVAL_URL.
-    | 3. Path tetap pendek: /approval/jd/{token}
+    | Link asli tetap memakai APP_APPROVAL_URL + path pendek /approval/jd/{token}.
+    | Di tampilan, URL dipendekkan agar halaman lebih rapi.
+    | Tombol copy tetap menyalin URL asli yang lengkap.
     |--------------------------------------------------------------------------
     */
 
@@ -69,6 +68,16 @@
         && !empty($approvalToken)
         && !empty($pendingVersion)
         && !empty($shortApprovalUrl);
+
+    $approvalLinkDisplay = '-';
+
+    if (!empty($shortApprovalUrl)) {
+        $approvalDisplayToken = $approvalToken
+            ? \Illuminate\Support\Str::limit($approvalToken, 8, '...')
+            : 'token';
+
+        $approvalLinkDisplay = '/approval/jd/' . $approvalDisplayToken;
+    }
 @endphp
 
 <div class="approval-panel">
@@ -77,13 +86,6 @@
             <div class="approval-eyebrow">Job Description Approval</div>
 
             <h1 class="approval-title">Approval Job Description</h1>
-
-            <p class="approval-desc">
-                Halaman ini digunakan HCM/Admin untuk memantau status approval,
-                membagikan short link approval awal, dan melihat audit trail approval.
-                QR approval tidak ditampilkan agar alur approval lebih terkendali melalui
-                link internal dan halaman detail jabatan.
-            </p>
         </div>
 
         <div class="approval-actions approval-actions-right">
@@ -104,7 +106,7 @@
 
         @if($errors->any())
             <div class="approval-alert danger">
-                <strong>Periksa kembali data berikut:</strong>
+                <div>Periksa kembali data berikut:</div>
 
                 <ul style="margin:8px 0 0; padding-left:18px;">
                     @foreach($errors->all() as $error)
@@ -117,8 +119,7 @@
         @if(!empty($isLocalApprovalUrl))
             <div class="approval-alert warning">
                 Link approval masih memakai alamat lokal/private, sehingga tidak bisa dibuka dari handphone.
-                Pastikan <strong>APP_APPROVAL_URL</strong> mengarah ke domain ngrok, lalu jalankan
-                <strong>php artisan config:clear</strong>.
+                Pastikan APP_APPROVAL_URL mengarah ke domain ngrok, lalu jalankan php artisan config:clear.
             </div>
         @endif
 
@@ -218,40 +219,29 @@
 
         <div class="approval-grid-1" style="margin-top:18px;">
             <div class="approval-card">
-                <div class="approval-card-title">
-                    Short Link Approval Awal
-                </div>
+                <div class="approval-card-title">Short Link Approval Awal</div>
 
                 <div class="approval-card-body">
                     @if($canShowApprovalLink)
-                        <div class="approval-link-row" style="width:100%; max-width:920px;">
+                        <div class="approval-link-row" style="width:100%; max-width:760px;">
                             <input type="text"
                                    id="approvalLinkInput"
                                    class="approval-input"
-                                   value="{{ $shortApprovalUrl }}"
+                                   value="{{ $approvalLinkDisplay }}"
                                    readonly>
 
                             <button type="button"
+                                    id="copyApprovalLinkBtn"
                                     class="approval-btn primary"
+                                    data-full-url="{{ $shortApprovalUrl }}"
                                     onclick="copyApprovalLink()">
                                 Copy Short Link
                             </button>
                         </div>
 
-                        <div class="approval-note" style="margin-top:10px; max-width:920px; text-align:left;">
-                            Short link ini hanya aktif untuk versi pending saat ini.
-                            Setelah job description approved final, link akan ditutup dan token dinonaktifkan.
-                            Jika job description diperbarui lagi, sistem membuat short link baru dengan token berbeda.
-                        </div>
-
-                        <div style="margin-top:10px; max-width:920px;">
-                            <small style="color:#667085; font-weight:700;">
-                                Link yang akan dicopy:
-                            </small>
-
-                            <code style="display:block; margin-top:4px; background:#f3f4f6; padding:8px 10px; border-radius:8px; color:#344054; white-space:normal; word-break:break-all;">
-                                {{ $shortApprovalUrl }}
-                            </code>
+                        <div class="approval-note" style="margin-top:10px; max-width:760px; text-align:left;">
+                            Link yang tampil dipendekkan agar halaman lebih rapi. Tombol copy tetap menyalin link approval asli.
+                            Link akan ditutup setelah job description approved final.
                         </div>
                     @elseif($jabatan->is_approval_final)
                         <div class="approval-alert success" style="margin-bottom:0;">
@@ -270,54 +260,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="approval-grid-1" style="margin-top:18px;">
-            <div class="approval-card">
-                <div class="approval-card-title">
-                    Riwayat Aktivitas Approval
-                </div>
-
-                <div class="approval-card-body">
-                    <div class="table-responsive">
-                        <table class="approval-table">
-                            <thead>
-                                <tr>
-                                    <th>Waktu</th>
-                                    <th>Aktivitas</th>
-                                    <th>Pengguna</th>
-                                    <th>Role</th>
-                                    <th>Jabatan</th>
-                                    <th>Departemen</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                @forelse($jabatan->approvalLogs ?? [] as $log)
-                                    <tr>
-                                        <td>{{ $formatTanggalIndonesia($log->created_at) }}</td>
-                                        <td>{{ $log->action_label }}</td>
-                                        <td>{{ $log->actor_name ?? '-' }}</td>
-                                        <td>{{ strtoupper($log->actor_role ?? '-') }}</td>
-                                        <td>{{ $log->actor_jabatan ?? '-' }}</td>
-                                        <td>{{ $log->actor_departemen ?? '-' }}</td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="6" class="text-center">
-                                            Belum ada aktivitas approval.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="approval-note" style="margin-top:10px; text-align:left;">
-                        Audit trail ditampilkan per jabatan, bukan gabungan seluruh jabatan.
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 @endsection
@@ -326,12 +268,13 @@
 <script>
 function copyApprovalLink(){
     const input = document.getElementById('approvalLinkInput');
+    const button = document.getElementById('copyApprovalLinkBtn');
 
-    if (!input) {
+    if (!input || !button) {
         return;
     }
 
-    const link = input.value;
+    const link = button.dataset.fullUrl || input.value;
 
     const copyDone = function(){
         fetch("{{ route('jabatan.approval.record-share', $jabatan->id_jabatan) }}", {
@@ -347,7 +290,7 @@ function copyApprovalLink(){
                 copied_url: link
             })
         }).finally(function(){
-            alert('Short link approval berhasil disalin dan aktivitas copy link sudah dicatat.');
+            alert('Short link approval berhasil disalin.');
         });
     };
 
@@ -355,15 +298,19 @@ function copyApprovalLink(){
         navigator.clipboard.writeText(link)
             .then(copyDone)
             .catch(function(){
+                input.value = link;
                 input.select();
                 input.setSelectionRange(0, 99999);
                 document.execCommand('copy');
+                input.value = "{{ $approvalLinkDisplay }}";
                 copyDone();
             });
     } else {
+        input.value = link;
         input.select();
         input.setSelectionRange(0, 99999);
         document.execCommand('copy');
+        input.value = "{{ $approvalLinkDisplay }}";
         copyDone();
     }
 }

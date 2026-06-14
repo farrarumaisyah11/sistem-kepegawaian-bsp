@@ -43,8 +43,10 @@
         ?: $jabatan->latestApprovedVersion
         ?: null;
 
+    $jabatanNama = $jabatan->nama_jabatan ?? '-';
+    $departemenNama = $jabatan->departemenMaster->nama_departemen ?? $jabatan->departemen ?? '-';
+
     $modalId = 'approvalLogModal-' . ($jabatan->id_jabatan ?? '0');
-    $pdfAreaId = 'approvalLogPdfArea-' . ($jabatan->id_jabatan ?? '0');
     $tableId = 'approvalLogTable-' . ($jabatan->id_jabatan ?? '0');
 @endphp
 
@@ -132,9 +134,9 @@
 @if(($prefix === 'hcm') && ($jabatan->approval_flow_status ?? null) === 'waiting_hcm_confirmation' && $jabatan->pendingVersion)
     <div class="alert alert-warning mt-3 mb-0 d-print-none jd-approval-alert">
         Approval awal sudah dilakukan oleh
-        <strong>{{ $jabatan->proposed_approved_by_name ?? '-' }}</strong>
+        <span class="jd-alert-emphasis">{{ $jabatan->proposed_approved_by_name ?? '-' }}</span>
         pada
-        <strong>{{ $formatApprovalDate($jabatan->proposed_approved_at ?? null) }}</strong>.
+        <span class="jd-alert-emphasis">{{ $formatApprovalDate($jabatan->proposed_approved_at ?? null) }}</span>.
         Dokumen tinggal menunggu approval final dari HCM.
     </div>
 @endif
@@ -152,7 +154,7 @@
                         Riwayat Approval Job Description
                     </h5>
                     <div class="jd-modal-subtitle">
-                        {{ $jabatan->nama_jabatan ?? '-' }} · {{ $jabatan->departemenMaster->nama_departemen ?? $jabatan->departemen ?? '-' }}
+                        {{ $jabatanNama }} · {{ $departemenNama }}
                     </div>
                 </div>
 
@@ -160,9 +162,19 @@
             </div>
 
             <div class="modal-body jd-modal-body">
+                <div class="jd-log-description-card">
+                    <div class="jd-log-description-label">Keterangan Log</div>
+                    <div class="jd-log-description-text">
+                        Log aktivitas approval ini menampilkan riwayat khusus untuk jabatan
+                        <span>{{ $jabatanNama }}</span>
+                        pada departemen
+                        <span>{{ $departemenNama }}</span>.
+                    </div>
+                </div>
+
                 <div class="jd-log-toolbar">
                     <div class="jd-log-toolbar-info">
-                        <strong>{{ $approvalLogs->count() }}</strong> aktivitas approval tercatat untuk jabatan ini.
+                        {{ $approvalLogs->count() }} aktivitas approval tercatat untuk jabatan ini.
                     </div>
 
                     <div class="jd-log-toolbar-actions">
@@ -171,13 +183,11 @@
                                 onclick="downloadApprovalLogCsv('{{ $tableId }}', '{{ $jabatan->id_jabatan ?? 0 }}')">
                             Download CSV
                         </button>
-
-                        
                     </div>
                 </div>
 
-                <div id="{{ $pdfAreaId }}" class="jd-log-a4-document">
-                    <div class="jd-log-pdf-header">
+                <div class="jd-log-document">
+                    <div class="jd-log-document-header">
                         <div class="jd-log-logo-box">
                             <img src="{{ asset('images/logo skk migas.png') }}" alt="SKK Migas">
                         </div>
@@ -192,36 +202,36 @@
                         </div>
                     </div>
 
-                    <div class="jd-log-meta-card pdf-card-keep">
+                    <div class="jd-log-meta-card">
                         <div class="jd-log-meta-grid">
                             <div>
                                 <span>Nama Jabatan</span>
-                                <strong>{{ $jabatan->nama_jabatan ?? '-' }}</strong>
+                                <div>{{ $jabatanNama }}</div>
                             </div>
                             <div>
                                 <span>Departemen</span>
-                                <strong>{{ $jabatan->departemenMaster->nama_departemen ?? $jabatan->departemen ?? '-' }}</strong>
+                                <div>{{ $departemenNama }}</div>
                             </div>
                             <div>
                                 <span>Status Approval</span>
-                                <strong>{{ $approvalStatusLabel }}</strong>
+                                <div>{{ $approvalStatusLabel }}</div>
                             </div>
                             <div>
                                 <span>Versi</span>
-                                <strong>{{ $approvalVersion ? 'Versi '.$approvalVersion->version_number : '-' }}</strong>
+                                <div>{{ $approvalVersion ? 'Versi '.$approvalVersion->version_number : '-' }}</div>
                             </div>
                             <div>
                                 <span>Approval Awal</span>
-                                <strong>{{ $jabatan->proposed_approved_by_name ?? '-' }}</strong>
+                                <div>{{ $jabatan->proposed_approved_by_name ?? '-' }}</div>
                             </div>
                             <div>
                                 <span>Final HCM</span>
-                                <strong>{{ $jabatan->hcm_confirmed_by_name ?? '-' }}</strong>
+                                <div>{{ $jabatan->hcm_confirmed_by_name ?? '-' }}</div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="jd-log-table-card pdf-card-keep">
+                    <div class="jd-log-table-card">
                         <div class="jd-log-section-title">Daftar Aktivitas Approval</div>
 
                         <div class="table-responsive">
@@ -238,7 +248,7 @@
                                 </thead>
                                 <tbody>
                                     @forelse($approvalLogs as $log)
-                                        <tr class="pdf-row-keep">
+                                        <tr>
                                             <td>{{ $formatApprovalDate($log->created_at) }}</td>
                                             <td>{{ $log->action_label }}</td>
                                             <td>{{ $log->actor_name ?? '-' }}</td>
@@ -258,12 +268,12 @@
                         </div>
                     </div>
 
-                    <div class="jd-log-footer pdf-card-keep">
+                    <div class="jd-log-footer">
                         <div>
-                            Dicetak oleh: <strong>{{ auth()->user()->nama ?? auth()->user()->name ?? auth()->user()->username ?? '-' }}</strong>
+                            Dilihat oleh: <span>{{ auth()->user()->nama ?? auth()->user()->name ?? auth()->user()->username ?? '-' }}</span>
                         </div>
                         <div>
-                            Tanggal cetak: <strong>{{ now()->locale('id')->translatedFormat('d F Y H:i') }}</strong>
+                            Waktu akses: <span>{{ now()->locale('id')->translatedFormat('d F Y H:i') }}</span>
                         </div>
                     </div>
                 </div>
@@ -276,7 +286,6 @@
                         onclick="downloadApprovalLogCsv('{{ $tableId }}', '{{ $jabatan->id_jabatan ?? 0 }}')">
                     Download CSV
                 </button>
-               
             </div>
         </div>
     </div>
@@ -392,18 +401,14 @@
         font-weight: 600;
     }
 
+    .jd-alert-emphasis {
+        font-weight: 700;
+        color: #78350f;
+    }
+
     .jd-modal-header {
         background: linear-gradient(135deg, #273957 0%, #3f4a32 100%);
         color: #ffffff;
-    }
-
-    .jd-modal-eyebrow {
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: .12em;
-        text-transform: uppercase;
-        color: #f4c542;
-        margin-bottom: 3px;
     }
 
     .jd-modal-subtitle {
@@ -415,6 +420,35 @@
 
     .jd-modal-body {
         background: #f8fafc;
+    }
+
+    .jd-log-description-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+    }
+
+    .jd-log-description-label {
+        color: #273957;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        margin-bottom: 5px;
+    }
+
+    .jd-log-description-text {
+        color: #475569;
+        font-size: 13px;
+        line-height: 1.5;
+        font-weight: 600;
+    }
+
+    .jd-log-description-text span {
+        color: #111827;
+        font-weight: 800;
     }
 
     .jd-log-toolbar {
@@ -438,18 +472,18 @@
         flex-wrap: wrap;
     }
 
-    .jd-log-a4-document {
+    .jd-log-document {
         background: #ffffff;
         color: #111827;
-        padding: 18mm 16mm;
-        width: 210mm;
+        padding: 16px;
+        width: 100%;
         max-width: 100%;
         margin: 0 auto;
         border-radius: 12px;
         box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
     }
 
-    .jd-log-pdf-header {
+    .jd-log-document-header {
         display: grid;
         grid-template-columns: 88px 1fr 88px;
         gap: 14px;
@@ -495,13 +529,6 @@
         color: #111827;
     }
 
-    .jd-log-subtitle {
-        margin-top: 3px;
-        font-size: 11px;
-        color: #64748b;
-        font-weight: 700;
-    }
-
     .jd-log-meta-card,
     .jd-log-table-card,
     .jd-log-footer {
@@ -528,11 +555,12 @@
         margin-bottom: 3px;
     }
 
-    .jd-log-meta-grid strong {
+    .jd-log-meta-grid div div {
         display: block;
         color: #111827;
         font-size: 12px;
         line-height: 1.35;
+        font-weight: 700;
     }
 
     .jd-log-section-title {
@@ -575,10 +603,9 @@
         color: #475569;
     }
 
-    .pdf-card-keep,
-    .pdf-row-keep {
-        break-inside: avoid;
-        page-break-inside: avoid;
+    .jd-log-footer span {
+        color: #111827;
+        font-weight: 700;
     }
 
     @media (max-width: 768px) {
@@ -592,12 +619,12 @@
             width: 100%;
         }
 
-        .jd-log-a4-document {
+        .jd-log-document {
             width: 100%;
             padding: 14px;
         }
 
-        .jd-log-pdf-header {
+        .jd-log-document-header {
             grid-template-columns: 1fr;
             text-align: center;
         }
@@ -623,7 +650,6 @@
 @endpush
 
 @push('scripts')
-<script src="{{ asset('vendor/html2pdf/html2pdf.bundle.min.js') }}"></script>
 <script>
 function finalHcmSubmitOnce(form){
     const button = form.querySelector('button[type="submit"]');
@@ -668,51 +694,6 @@ function downloadApprovalLogCsv(tableId, jabatanId) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-}
-
-function downloadApprovalLogPdf(areaId, jabatanId) {
-    const area = document.getElementById(areaId);
-    if (!area) return;
-
-    const fileName = safeFileName('Riwayat Approval Jabatan ' + jabatanId + '.pdf');
-
-    if (typeof html2pdf === 'undefined') {
-        alert('File html2pdf belum ditemukan. Pastikan file public/vendor/html2pdf/html2pdf.bundle.min.js tersedia.');
-        return;
-    }
-
-    const clone = area.cloneNode(true);
-    clone.style.width = '210mm';
-    clone.style.maxWidth = '210mm';
-    clone.style.boxShadow = 'none';
-    clone.style.borderRadius = '0';
-    clone.style.margin = '0';
-
-    const opt = {
-        margin: [8, 8, 8, 8],
-        filename: fileName,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            logging: false,
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: 1100
-        },
-        jsPDF: {
-            unit: 'mm',
-            format: 'a4',
-            orientation: 'portrait'
-        },
-        pagebreak: {
-            mode: ['css', 'legacy'],
-            avoid: ['.pdf-card-keep', '.pdf-row-keep', 'tr']
-        }
-    };
-
-    html2pdf().set(opt).from(clone).save();
 }
 </script>
 @endpush

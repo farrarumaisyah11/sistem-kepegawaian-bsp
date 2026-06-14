@@ -51,13 +51,6 @@
             background:var(--apv-page);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | HEADER APPROVAL
-        |--------------------------------------------------------------------------
-        | Layout approval tidak memakai sidebar, jadi header mulai dari left: 0.
-        |--------------------------------------------------------------------------
-        */
         .approval-topbar{
             height:64px;
             background:#ffffff;
@@ -82,38 +75,39 @@
             gap:16px;
         }
 
-       .approval-brand{
-    display:flex;
-    align-items:center;
-    gap:0;
-    min-width:0;
-}
+        .approval-brand{
+            display:flex;
+            align-items:center;
+            gap:0;
+            min-width:0;
+        }
 
-.approval-brand-logo{
-    width:100px;
-    height:100px;
-    flex:0 0 100px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    margin-right:-24px;
-}
+        .approval-brand-logo{
+            width:100px;
+            height:100px;
+            flex:0 0 100px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            margin-right:-24px;
+        }
 
-.approval-brand-logo img{
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    display:block;
-}
+        .approval-brand-logo img{
+            width:100%;
+            height:100%;
+            object-fit:contain;
+            display:block;
+        }
 
-.approval-brand-text{
-    min-width:0;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    line-height:1.15;
-    margin-left:0;
-}
+        .approval-brand-text{
+            min-width:0;
+            display:flex;
+            flex-direction:column;
+            justify-content:center;
+            line-height:1.15;
+            margin-left:0;
+        }
+
         .approval-brand-title{
             font-size:14px;
             font-weight:900;
@@ -135,11 +129,31 @@
             font-weight:600;
         }
 
-        .approval-user-info{
+        .approval-profile-area{
+            position:relative;
             display:flex;
             align-items:center;
-            gap:10px;
             flex-shrink:0;
+        }
+
+        .approval-profile-trigger{
+            border:0;
+            background:transparent;
+            padding:0;
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+            cursor:pointer;
+            border-radius:14px;
+        }
+
+        .approval-profile-trigger:focus{
+            outline:none;
+        }
+
+        .approval-profile-trigger:hover .avatar-header,
+        .approval-profile-trigger:focus .avatar-header{
+            box-shadow:0 0 0 3px rgba(89,104,74,.13);
         }
 
         .approval-user-text{
@@ -150,8 +164,12 @@
             margin:0;
             font-size:12px;
             line-height:1;
-            font-weight:800;
+            font-weight:700;
             color:#111827;
+            max-width:190px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
         }
 
         .approval-user-role{
@@ -160,8 +178,12 @@
             font-size:9px;
             letter-spacing:.5px;
             text-transform:uppercase;
-            font-weight:800;
+            font-weight:700;
             color:#667085;
+            max-width:190px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
         }
 
         .avatar-header{
@@ -178,8 +200,9 @@
             align-items:center;
             justify-content:center;
             color:#fff;
-            font-weight:bold;
+            font-weight:700;
             box-shadow:0 2px 6px rgba(0,0,0,.12);
+            transition:.18s ease;
         }
 
         .avatar-header img{
@@ -191,11 +214,138 @@
             border-radius:50%;
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | MAIN APPROVAL CONTENT
-        |--------------------------------------------------------------------------
-        */
+        .approval-profile-dropdown{
+            position:absolute;
+            top:calc(100% + 12px);
+            right:0;
+            width:240px;
+            background:#fff;
+            border:1px solid #e5e7eb;
+            border-radius:16px;
+            box-shadow:0 18px 35px rgba(15,23,42,.14);
+            padding:12px;
+            opacity:0;
+            visibility:hidden;
+            transform:translateY(-6px);
+            transition:.18s ease;
+            z-index:2200;
+        }
+
+        .approval-profile-dropdown.show{
+            opacity:1;
+            visibility:visible;
+            transform:translateY(0);
+        }
+
+        .approval-profile-dropdown::before{
+            content:"";
+            position:absolute;
+            right:14px;
+            top:-7px;
+            width:14px;
+            height:14px;
+            background:#fff;
+            border-left:1px solid #e5e7eb;
+            border-top:1px solid #e5e7eb;
+            transform:rotate(45deg);
+        }
+
+        .approval-profile-dropdown-head{
+            display:flex;
+            align-items:center;
+            gap:10px;
+            padding:6px 4px 12px;
+            border-bottom:1px solid #eef0ea;
+            margin-bottom:8px;
+        }
+
+        .approval-profile-dropdown-avatar{
+            width:38px;
+            height:38px;
+            min-width:38px;
+            border-radius:50%;
+            background-color:#78845f;
+            color:#fff;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-weight:800;
+            overflow:hidden;
+        }
+
+        .approval-profile-dropdown-avatar img{
+            width:100%;
+            height:100%;
+            object-fit:cover;
+            border-radius:50%;
+            display:block;
+        }
+
+        .approval-profile-dropdown-name{
+            font-size:13px;
+            font-weight:700;
+            color:#1f2937;
+            line-height:1.25;
+            margin:0;
+            max-width:160px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
+
+        .approval-profile-dropdown-role{
+            display:block;
+            margin-top:3px;
+            font-size:10px;
+            font-weight:700;
+            color:#6b7280;
+            text-transform:uppercase;
+            letter-spacing:.45px;
+            line-height:1.25;
+            max-width:160px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
+
+        .approval-logout-form{
+            margin:0;
+        }
+
+        .approval-profile-dropdown-action{
+            width:100%;
+            border:0;
+            background:transparent;
+            display:flex;
+            align-items:center;
+            gap:10px;
+            padding:10px;
+            border-radius:12px;
+            color:#374151;
+            font-weight:700;
+            font-size:13px;
+            transition:.18s ease;
+            text-align:left;
+            cursor:pointer;
+        }
+
+        .approval-profile-dropdown-action:hover,
+        .approval-profile-dropdown-action:focus{
+            background:#f6f8f4;
+            color:#334027;
+            outline:none;
+        }
+
+        .approval-profile-dropdown-action.logout{
+            color:#b42318;
+        }
+
+        .approval-profile-dropdown-action.logout:hover,
+        .approval-profile-dropdown-action.logout:focus{
+            background:#fff1f0;
+            color:#b42318;
+        }
+
         .approval-main{
             width:min(1120px, calc(100% - 32px));
             margin:0 auto;
@@ -275,7 +425,7 @@
             border-bottom:1px solid var(--apv-border);
             color:var(--apv-primary-dark);
             font-size:13px;
-            font-weight:900;
+            font-weight:800;
             display:flex;
             justify-content:space-between;
             gap:12px;
@@ -305,13 +455,13 @@
             width:38%;
             background:#f7f9f2;
             color:#344054;
-            font-weight:900;
+            font-weight:800;
             text-align:left;
         }
 
         .approval-table td{
             color:var(--apv-text);
-            font-weight:650;
+            font-weight:600;
         }
 
         .approval-badge{
@@ -321,7 +471,7 @@
             padding:6px 12px;
             border-radius:999px;
             font-size:12px;
-            font-weight:900;
+            font-weight:800;
             border:1px solid transparent;
         }
 
@@ -353,7 +503,7 @@
             border:1px solid var(--apv-border);
             background:#ffffff;
             color:#344054;
-            font-weight:800;
+            font-weight:700;
             font-size:13px;
             text-decoration:none;
             cursor:pointer;
@@ -427,7 +577,7 @@
             margin-bottom:8px;
             color:#344054;
             font-size:13px;
-            font-weight:900;
+            font-weight:800;
         }
 
         .approval-textarea,
@@ -517,8 +667,10 @@
             }
 
             .approval-brand-logo{
-                width:48px;
-                height:48px;
+                width:60px;
+                height:60px;
+                flex:0 0 60px;
+                margin-right:-14px;
             }
 
             .approval-brand-title{
@@ -531,6 +683,11 @@
 
             .approval-user-text{
                 display:none;
+            }
+
+            .approval-profile-dropdown{
+                width:220px;
+                right:-2px;
             }
 
             .approval-main{
@@ -571,6 +728,18 @@
                 height:240px;
             }
         }
+
+        @media print{
+            .approval-topbar,
+            .approval-footer{
+                display:none !important;
+            }
+
+            .approval-main{
+                padding:0;
+                width:100%;
+            }
+        }
     </style>
 
     @stack('styles')
@@ -585,7 +754,12 @@
         $fotoHeader = null;
         $pegawaiLogin = null;
 
-        $roleLogin = data_get($userLogin, 'role') ?? session('role') ?? 'pegawai';
+        $roleLoginRaw =
+            data_get($userLogin, 'role')
+            ?? session('role')
+            ?? 'pegawai';
+
+        $roleLoginKey = strtolower(trim((string) $roleLoginRaw));
 
         $namaHeader =
             data_get($userLogin, 'name')
@@ -604,8 +778,11 @@
         |--------------------------------------------------------------------------
         | Khusus Role Pegawai
         |--------------------------------------------------------------------------
+        | Jika role login adalah pegawai, nama dan jabatan diambil dari tabel pegawai.
+        | Untuk HCM/admin, data tetap memakai auth/session seperti sebelumnya.
+        |--------------------------------------------------------------------------
         */
-        if ($roleLogin === 'pegawai') {
+        if ($roleLoginKey === 'pegawai') {
             $nipLogin =
                 data_get($userLogin, 'nip')
                 ?? data_get($userLogin, 'username')
@@ -687,6 +864,8 @@
                 }
             }
         }
+
+        $inisialHeader = strtoupper(substr($namaHeader ?? 'P', 0, 1));
     @endphp
 
     <div class="approval-shell">
@@ -702,23 +881,59 @@
                     </div>
                 </div>
 
-                <div class="approval-user-info">
-                    <div class="approval-user-text">
-                        <p class="approval-user-name">
-                            {{ $namaHeader }}
-                        </p>
+                <div class="approval-profile-area" id="approvalProfileArea">
+                    <button type="button"
+                            class="approval-profile-trigger"
+                            id="approvalProfileToggle"
+                            aria-label="Menu Profil"
+                            aria-expanded="false">
+                        <div class="approval-user-text">
+                            <p class="approval-user-name">
+                                {{ $namaHeader }}
+                            </p>
 
-                        <small class="approval-user-role">
-                            {{ $roleHeader }}
-                        </small>
-                    </div>
+                            <small class="approval-user-role">
+                                {{ $roleHeader }}
+                            </small>
+                        </div>
 
-                    <div class="avatar-header">
-                        @if ($roleLogin === 'pegawai' && $fotoHeader)
-                            <img src="{{ $fotoHeader }}" alt="Foto Pegawai">
-                        @else
-                            {{ strtoupper(substr($namaHeader ?? 'P', 0, 1)) }}
-                        @endif
+                        <div class="avatar-header">
+                            @if ($roleLoginKey === 'pegawai' && $fotoHeader)
+                                <img src="{{ $fotoHeader }}" alt="Foto Pegawai">
+                            @else
+                                {{ $inisialHeader }}
+                            @endif
+                        </div>
+                    </button>
+
+                    <div class="approval-profile-dropdown" id="approvalProfileDropdown">
+                        <div class="approval-profile-dropdown-head">
+                            <div class="approval-profile-dropdown-avatar">
+                                @if ($roleLoginKey === 'pegawai' && $fotoHeader)
+                                    <img src="{{ $fotoHeader }}" alt="Foto Pegawai">
+                                @else
+                                    {{ $inisialHeader }}
+                                @endif
+                            </div>
+
+                            <div style="min-width:0;">
+                                <p class="approval-profile-dropdown-name">
+                                    {{ $namaHeader }}
+                                </p>
+
+                                <span class="approval-profile-dropdown-role">
+                                    {{ $roleHeader }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <form action="{{ route('logout') }}" method="POST" class="approval-logout-form">
+                            @csrf
+                            <button type="submit" class="approval-profile-dropdown-action logout">
+                                <span aria-hidden="true">↪</span>
+                                <span>Keluar</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -735,7 +950,7 @@
 
             @if($errors->any())
                 <div class="approval-alert danger">
-                    <strong>Terjadi kesalahan:</strong>
+                    <span>Terjadi kesalahan:</span>
                     <ul style="margin:8px 0 0; padding-left:18px;">
                         @foreach($errors->all() as $error)
                             <li>{{ $error }}</li>
@@ -751,6 +966,62 @@
             Dokumen approval ini diproses melalui Sistem Informasi SDM PT. Bumi Siak Pusako.
         </footer>
     </div>
+
+    <script>
+        (function () {
+            if (window.__BSP_APPROVAL_PROFILE_READY__) {
+                return;
+            }
+
+            window.__BSP_APPROVAL_PROFILE_READY__ = true;
+
+            document.addEventListener('DOMContentLoaded', function () {
+                const toggle = document.getElementById('approvalProfileToggle');
+                const menu = document.getElementById('approvalProfileDropdown');
+                const area = document.getElementById('approvalProfileArea');
+
+                if (!toggle || !menu || !area) {
+                    return;
+                }
+
+                function closeApprovalProfileDropdown() {
+                    menu.classList.remove('show');
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+
+                function openApprovalProfileDropdown() {
+                    menu.classList.add('show');
+                    toggle.setAttribute('aria-expanded', 'true');
+                }
+
+                toggle.addEventListener('click', function (event) {
+                    event.stopPropagation();
+
+                    if (menu.classList.contains('show')) {
+                        closeApprovalProfileDropdown();
+                    } else {
+                        openApprovalProfileDropdown();
+                    }
+                });
+
+                menu.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                });
+
+                document.addEventListener('click', function (event) {
+                    if (!area.contains(event.target)) {
+                        closeApprovalProfileDropdown();
+                    }
+                });
+
+                document.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape') {
+                        closeApprovalProfileDropdown();
+                    }
+                });
+            });
+        })();
+    </script>
 
     @stack('scripts')
 </body>
