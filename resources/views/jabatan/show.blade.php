@@ -345,9 +345,7 @@
                             </table>
                         </div>
 
-                        <div class="jd-modal-note">
-                            Kolom IP tidak ditampilkan pada UI agar tampilan lebih aman dan ringkas untuk kebutuhan internal corporate.
-                        </div>
+                        
                     </div>
                 </div>
             </div>
