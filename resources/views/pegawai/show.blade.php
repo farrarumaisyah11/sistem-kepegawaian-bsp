@@ -1283,101 +1283,979 @@ body.pdf-exporting .paper-a4{
 }
 </style>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-<script>
-function printPegawaiA4() {
-    const source = document.getElementById('pegawai-print-area');
-    if (!source) {
-        window.print();
-        return;
-    }
-
-    const oldClone = document.getElementById('pegawai-print-clone');
-    if (oldClone) {
-        oldClone.remove();
-    }
-
-    const cloneWrapper = document.createElement('div');
-    cloneWrapper.id = 'pegawai-print-clone';
-
-    const clonedPaper = source.cloneNode(true);
-    clonedPaper.id = 'pegawai-print-area-clone';
-
-    cloneWrapper.appendChild(clonedPaper);
-    document.body.appendChild(cloneWrapper);
-    document.body.classList.add('pegawai-printing');
-
-    const cleanupPrint = function () {
-        document.body.classList.remove('pegawai-printing');
-        const activeClone = document.getElementById('pegawai-print-clone');
-        if (activeClone) {
-            activeClone.remove();
-        }
-        window.removeEventListener('afterprint', cleanupPrint);
-    };
-
-    window.addEventListener('afterprint', cleanupPrint);
-
-    setTimeout(function () {
-        window.print();
-    }, 80);
+{{-- ========================================================================
+     EXPORT KHUSUS PRINT & PDF DETAIL PEGAWAI
+     - Tidak mengubah tampilan Detail Pegawai pada layar.
+     - Hanya dipakai ketika tombol Print atau Download PDF ditekan.
+     - Setiap halaman A4 memiliki kop yang sama.
+     - Setiap lanjutan dibuat sebagai card/section baru yang tertutup penuh.
+     ======================================================================== --}}
+<style>
+/* ========================================================================
+   EXPORT-ONLY LAYOUT
+   Selector dibatasi ke .pegawai-export-root / body.pegawai-printing sehingga
+   tidak mengubah tampilan Detail Pegawai yang sudah ada pada layar.
+   ======================================================================== */
+.pegawai-export-root{
+    position:fixed;
+    left:-30000px;
+    top:0;
+    width:210mm;
+    min-width:210mm;
+    max-width:210mm;
+    margin:0;
+    padding:0;
+    display:block;
+    visibility:visible;
+    opacity:1;
+    z-index:-9999;
+    pointer-events:none;
+    background:#ffffff;
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    const downloadBtn = document.getElementById('downloadPdfBtn');
-    if (!downloadBtn) return;
+.pegawai-export-page{
+    width:210mm;
+    height:297mm;
+    min-height:297mm;
+    max-height:297mm;
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    background:#ffffff;
+    border:1px solid #dfe6d7;
+    box-shadow:none;
+    break-after:page;
+    page-break-after:always;
+}
 
-    downloadBtn.addEventListener('click', function () {
-        const element = document.getElementById('pegawai-print-area');
-        const originalText = downloadBtn.innerHTML;
+/*
+|--------------------------------------------------------------------------
+| Print safe page
+|--------------------------------------------------------------------------
+| Browser print engine tidak selalu menghitung area cetak sama persis dengan
+| A4 canvas. Karena itu halaman khusus Print dibuat 279mm, lalu @page
+| memberi margin atas-bawah 9mm. Sisa 18mm adalah area aman agar card yang
+| sudah dipetakan JavaScript tidak terpotong di tepi bawah kertas.
+| PDF tetap memakai 297mm penuh sehingga tampilannya tidak berubah.
+*/
+.pegawai-export-page--print{
+    height:279mm;
+    min-height:279mm;
+    max-height:279mm;
+}
 
-        downloadBtn.disabled = true;
-        downloadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Menyiapkan PDF...';
+.pegawai-export-page:last-child{
+    break-after:auto;
+    page-break-after:auto;
+}
 
-        const opt = {
-            // Top dan bottom margin dibuat agar halaman lanjutan tidak terlalu mepet ke atas/bawah.
-            // Kiri-kanan tetap 0 supaya lebar A4 tetap sama seperti tampilan show.
-            margin: [8, 0, 8, 0],
-            filename: 'pegawai-{{ $pegawai->nip }}-{{ \Illuminate\Support\Str::slug($pegawai->nama ?? "pegawai") }}.pdf',
+.pegawai-export-page .paper-header{
+    flex:0 0 auto;
+    box-sizing:border-box;
+    padding:10mm 12mm 5mm 12mm;
+    border-bottom:1px solid var(--hr-border-strong);
+    background:#ffffff;
+}
+
+/* Ruang atas ini sengaja disediakan pada setiap halaman lanjutan agar card
+   tidak menempel ke kop. Semua card yang dilanjutkan dibangun ulang lengkap
+   dengan border atas, header section, dan frame-nya. */
+.pegawai-export-body{
+    flex:1 1 auto;
+    min-height:0;
+    box-sizing:border-box;
+    overflow:hidden;
+    padding:8mm 12mm 10mm 12mm;
+    background:#ffffff;
+}
+
+.pegawai-export-body > :first-child{
+    margin-top:0 !important;
+}
+
+/* Hasil export selalu desktop layout, walaupun tombol ditekan dari HP. */
+.pegawai-export-root .header-grid{
+    display:grid !important;
+    grid-template-columns:72px 1fr 72px !important;
+    gap:14px !important;
+    align-items:center !important;
+}
+
+.pegawai-export-root .logo-box img{
+    max-width:56px !important;
+    max-height:56px !important;
+}
+
+.pegawai-export-root .profile-hero{
+    display:grid !important;
+    grid-template-columns:118px 1fr !important;
+    gap:16px !important;
+    align-items:center !important;
+    text-align:left !important;
+}
+
+.pegawai-export-root .profile-photo-box{
+    width:106px !important;
+    height:132px !important;
+    margin:0 !important;
+}
+
+.pegawai-export-root .pegawai-meta,
+.pegawai-export-root .status-row{
+    justify-content:flex-start !important;
+}
+
+.pegawai-export-root .info-grid{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:12px !important;
+    padding:14px !important;
+}
+
+.pegawai-export-root .table-responsive{
+    overflow:visible !important;
+}
+
+.pegawai-export-root .report-table{
+    width:100% !important;
+    table-layout:fixed !important;
+}
+
+.pegawai-export-root .report-table thead{
+    display:table-header-group !important;
+}
+
+.pegawai-export-root .profile-hero,
+.pegawai-export-root .section-block,
+.pegawai-export-root .info-card,
+.pegawai-export-root .empty-state,
+.pegawai-export-root .document-footer{
+    page-break-inside:avoid !important;
+    break-inside:avoid !important;
+    break-inside:avoid-page !important;
+}
+
+.pegawai-export-root .section-heading,
+.pegawai-export-root .info-card-title,
+.pegawai-export-root .report-table thead{
+    page-break-after:avoid !important;
+    break-after:avoid !important;
+    break-after:avoid-page !important;
+}
+
+.pegawai-export-root .info-table tr,
+.pegawai-export-root .report-table tr{
+    page-break-inside:avoid !important;
+    break-inside:avoid !important;
+    break-inside:avoid-page !important;
+}
+
+/* Label hanya ada pada frame/card lanjutan, tidak mengubah show di layar. */
+.pegawai-export-root .export-continuation-label{
+    display:inline-flex;
+    align-items:center;
+    margin-left:auto;
+    padding:3px 8px;
+    border:1px solid var(--hr-border-strong);
+    border-radius:999px;
+    background:#ffffff;
+    color:#52613f;
+    font-size:9px;
+    font-weight:800;
+    letter-spacing:.03em;
+    line-height:1.2;
+    white-space:nowrap;
+}
+
+.pegawai-export-root .paper-header,
+.pegawai-export-root .paper-body,
+.pegawai-export-root .profile-hero,
+.pegawai-export-root .info-chip,
+.pegawai-export-root .section-block,
+.pegawai-export-root .info-card,
+.pegawai-export-root .doc-title-wrap,
+.pegawai-export-root .section-heading,
+.pegawai-export-root .info-card-title,
+.pegawai-export-root .info-table th,
+.pegawai-export-root .report-table thead th{
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+}
+
+@page{
+    size:A4 portrait;
+    margin:9mm 0 !important;
+}
+
+@page:first{
+    margin:9mm 0 !important;
+}
+
+@media print{
+    /* Saat tombol Print dipakai, hanya halaman export yang terlihat. */
+    body.pegawai-printing #pegawai-print-area,
+    body.pegawai-printing #pegawai-print-area *,
+    body.pegawai-printing .top-actions,
+    body.pegawai-printing .d-print-none{
+        visibility:hidden !important;
+    }
+
+    body.pegawai-printing .pegawai-export-root,
+    body.pegawai-printing .pegawai-export-root *{
+        visibility:visible !important;
+    }
+
+    body.pegawai-printing .pegawai-export-root{
+        position:absolute !important;
+        left:0 !important;
+        top:0 !important;
+        width:210mm !important;
+        min-width:210mm !important;
+        max-width:210mm !important;
+        z-index:2147483647 !important;
+        display:block !important;
+        opacity:1 !important;
+        overflow:visible !important;
+        background:#ffffff !important;
+    }
+
+    body.pegawai-printing .pegawai-export-page{
+        width:210mm !important;
+        height:279mm !important;
+        min-height:279mm !important;
+        max-height:279mm !important;
+        box-sizing:border-box !important;
+        margin:0 !important;
+        border:1px solid #dfe6d7 !important;
+        box-shadow:none !important;
+        overflow:hidden !important;
+        break-after:page !important;
+        page-break-after:always !important;
+    }
+
+    body.pegawai-printing .pegawai-export-page:last-child{
+        break-after:auto !important;
+        page-break-after:auto !important;
+    }
+
+    body.pegawai-printing .pegawai-export-page .paper-header{
+        padding:10mm 12mm 5mm 12mm !important;
+    }
+
+    body.pegawai-printing .pegawai-export-body{
+        padding:8mm 12mm 10mm 12mm !important;
+        overflow:hidden !important;
+    }
+
+    /* Jangan izinkan browser memecah card yang telah dibentuk ulang oleh
+       export engine. Jika tidak muat, engine sudah membuat frame baru pada
+       halaman selanjutnya, lengkap dengan border atas dan heading. */
+    body.pegawai-printing .pegawai-export-body > .profile-hero,
+    body.pegawai-printing .pegawai-export-body > .section-block,
+    body.pegawai-printing .pegawai-export-body > .empty-state,
+    body.pegawai-printing .pegawai-export-body > .document-footer,
+    body.pegawai-printing .pegawai-export-body .info-card,
+    body.pegawai-printing .pegawai-export-body .report-table tr{
+        break-inside:avoid !important;
+        break-inside:avoid-page !important;
+        page-break-inside:avoid !important;
+    }
+}
+</style>
+
+{{-- File lokal diprioritaskan. Bila belum ada, script akan mencoba CDN otomatis. --}}
+<script src="{{ asset('vendor/html2pdf/html2pdf.bundle.min.js') }}"></script>
+<script>
+(function () {
+    'use strict';
+
+    const EXPORT_ROOT_ID = 'pegawai-export-root';
+    const PDF_SCALE = 2;
+    const DESKTOP_CAPTURE_WIDTH = 1440;
+    const A4_WIDTH_MM = 210;
+    const A4_HEIGHT_MM = 297;
+
+    function getSourcePaper() {
+        return document.getElementById('pegawai-print-area');
+    }
+
+    function getOrCreateExportRoot() {
+        let root = document.getElementById(EXPORT_ROOT_ID);
+
+        if (!root) {
+            root = document.createElement('div');
+            root.id = EXPORT_ROOT_ID;
+            root.className = 'pegawai-export-root';
+            document.body.appendChild(root);
+        }
+
+        return root;
+    }
+
+    function resetExportRoot(root, mode) {
+        root.innerHTML = '';
+        root.className = 'pegawai-export-root' + (mode === 'print' ? ' pegawai-export-root--print' : ' pegawai-export-root--pdf');
+        root.dataset.exportMode = mode || 'pdf';
+        root.style.left = '-30000px';
+        root.style.top = '0';
+        root.style.zIndex = '-9999';
+        root.style.visibility = 'visible';
+        root.style.opacity = '1';
+        root.style.display = 'block';
+        root.style.pointerEvents = 'none';
+    }
+
+    function removeExportRoot() {
+        const root = document.getElementById(EXPORT_ROOT_ID);
+        if (root) {
+            root.remove();
+        }
+    }
+
+    function waitForFonts() {
+        if (document.fonts && document.fonts.ready) {
+            return document.fonts.ready.catch(function () {});
+        }
+
+        return Promise.resolve();
+    }
+
+    function waitForImages(node) {
+        if (!node) {
+            return Promise.resolve();
+        }
+
+        const images = Array.from(node.querySelectorAll('img'));
+
+        return Promise.all(images.map(function (img) {
+            if (img.complete && img.naturalWidth > 0) {
+                return Promise.resolve();
+            }
+
+            return new Promise(function (resolve) {
+                const done = function () { resolve(); };
+                img.addEventListener('load', done, { once: true });
+                img.addEventListener('error', done, { once: true });
+                setTimeout(done, 5000);
+            });
+        }));
+    }
+
+    function nextFrame() {
+        return new Promise(function (resolve) {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(resolve);
+            });
+        });
+    }
+
+    function ensureHtml2Pdf() {
+        if (window.html2pdf) {
+            return Promise.resolve();
+        }
+
+        return new Promise(function (resolve, reject) {
+            const existing = document.querySelector('script[data-pegawai-html2pdf-cdn="true"]');
+
+            if (existing) {
+                existing.addEventListener('load', function () {
+                    window.html2pdf ? resolve() : reject(new Error('Library PDF tidak tersedia.'));
+                }, { once: true });
+
+                existing.addEventListener('error', function () {
+                    reject(new Error('Library PDF tidak dapat dimuat.'));
+                }, { once: true });
+
+                return;
+            }
+
+            const cdn = document.createElement('script');
+            cdn.dataset.pegawaiHtml2pdfCdn = 'true';
+            cdn.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+            cdn.async = true;
+            cdn.onload = function () {
+                window.html2pdf ? resolve() : reject(new Error('Library PDF tidak tersedia.'));
+            };
+            cdn.onerror = function () {
+                reject(new Error('Library PDF tidak dapat dimuat.'));
+            };
+            document.head.appendChild(cdn);
+        });
+    }
+
+    function createExportPage(root, headerTemplate) {
+        const page = document.createElement('section');
+        const mode = root.dataset.exportMode || 'pdf';
+        page.className = 'pegawai-export-page ' + (mode === 'print' ? 'pegawai-export-page--print' : 'pegawai-export-page--pdf');
+
+        const header = headerTemplate.cloneNode(true);
+        const body = document.createElement('div');
+        body.className = 'pegawai-export-body';
+
+        page.appendChild(header);
+        page.appendChild(body);
+        root.appendChild(page);
+
+        return { page: page, body: body };
+    }
+
+    function pageHasBodyContent(current) {
+        return !!(current && current.body && current.body.children.length);
+    }
+
+    function pageOverflows(current) {
+        if (!current || !current.body) {
+            return false;
+        }
+
+        return Math.ceil(current.body.scrollHeight) > Math.floor(current.body.clientHeight) + 1;
+    }
+
+    function addContinuationLabel(item, continuationNumber) {
+        const heading = item.querySelector('.section-heading');
+
+        if (!heading || heading.querySelector('.export-continuation-label')) {
+            return;
+        }
+
+        const label = document.createElement('span');
+        label.className = 'export-continuation-label';
+        label.textContent = 'Lanjutan ' + continuationNumber;
+        heading.appendChild(label);
+    }
+
+    /* Letakkan satu card/section utuh. Bila tidak muat di sisa halaman,
+       objek dipindahkan secara utuh ke halaman baru. */
+    function placeWholeItem(sourceItem, state, root, headerTemplate) {
+        let clone = sourceItem.cloneNode(true);
+        state.current.body.appendChild(clone);
+
+        if (!pageOverflows(state.current)) {
+            return true;
+        }
+
+        clone.remove();
+
+        if (pageHasBodyContent(state.current)) {
+            state.current = createExportPage(root, headerTemplate);
+            clone = sourceItem.cloneNode(true);
+            state.current.body.appendChild(clone);
+
+            if (!pageOverflows(state.current)) {
+                return true;
+            }
+
+            clone.remove();
+        }
+
+        return false;
+    }
+
+    function getDirectInfoCards(sourceSection) {
+        const cards = [];
+
+        Array.from(sourceSection.querySelectorAll('.info-grid')).forEach(function (grid) {
+            if (grid.closest('.section-block') !== sourceSection) {
+                return;
+            }
+
+            Array.from(grid.children).forEach(function (child) {
+                if (child.classList && child.classList.contains('info-card')) {
+                    cards.push(child);
+                }
+            });
+        });
+
+        return cards;
+    }
+
+    function buildSectionWithSingleInfoCard(sourceSection, sourceCard) {
+        const section = sourceSection.cloneNode(true);
+        const grids = Array.from(section.querySelectorAll('.info-grid')).filter(function (grid) {
+            return grid.closest('.section-block') === section;
+        });
+
+        if (!grids.length) {
+            return null;
+        }
+
+        grids.forEach(function (grid, index) {
+            if (index === 0) {
+                grid.innerHTML = '';
+                grid.appendChild(sourceCard.cloneNode(true));
+            } else {
+                grid.remove();
+            }
+        });
+
+        return section;
+    }
+
+    function getFirstInfoCard(section) {
+        return Array.from(section.querySelectorAll('.info-card')).find(function (card) {
+            return card.closest('.section-block') === section;
+        }) || null;
+    }
+
+    function getInfoTable(card) {
+        return card ? card.querySelector('table.info-table') : null;
+    }
+
+    function buildInfoSectionWithRows(sourceSection, sourceCard, rows) {
+        const section = buildSectionWithSingleInfoCard(sourceSection, sourceCard);
+        const card = getFirstInfoCard(section);
+        const table = getInfoTable(card);
+
+        if (!section || !table) {
+            return null;
+        }
+
+        Array.from(table.querySelectorAll('tr')).forEach(function (row) {
+            row.remove();
+        });
+
+        rows.forEach(function (row) {
+            table.appendChild(row.cloneNode(true));
+        });
+
+        return section;
+    }
+
+    /* Jika sebuah info-card tunggal terlalu tinggi, pecah per baris tabel.
+       Setiap pecahan tetap berada dalam section dan info-card baru penuh. */
+    function splitSingleInfoCardRows(sourceSection, sourceCard, state, root, headerTemplate) {
+        const sourceTable = getInfoTable(sourceCard);
+        const sourceRows = sourceTable ? Array.from(sourceTable.querySelectorAll('tr')) : [];
+
+        if (!sourceRows.length) {
+            return false;
+        }
+
+        let part = 0;
+        let frame = null;
+        let currentRows = [];
+
+        function startPart() {
+            part += 1;
+            currentRows = [];
+            frame = buildInfoSectionWithRows(sourceSection, sourceCard, currentRows);
+
+            if (!frame) {
+                return false;
+            }
+
+            if (part > 1) {
+                addContinuationLabel(frame, part - 1);
+            }
+
+            state.current.body.appendChild(frame);
+
+            if (pageOverflows(state.current) && pageHasBodyContent(state.current)) {
+                frame.remove();
+                state.current = createExportPage(root, headerTemplate);
+                frame = buildInfoSectionWithRows(sourceSection, sourceCard, currentRows);
+
+                if (part > 1) {
+                    addContinuationLabel(frame, part - 1);
+                }
+
+                state.current.body.appendChild(frame);
+            }
+
+            return true;
+        }
+
+        if (!startPart()) {
+            return false;
+        }
+
+        sourceRows.forEach(function (sourceRow) {
+            const row = sourceRow.cloneNode(true);
+            const table = getInfoTable(getFirstInfoCard(frame));
+            table.appendChild(row);
+            currentRows.push(sourceRow);
+
+            if (!pageOverflows(state.current)) {
+                return;
+            }
+
+            row.remove();
+            currentRows.pop();
+
+            /* Baris tunggal yang sangat tinggi tidak boleh membuat halaman kosong. */
+            if (!currentRows.length) {
+                table.appendChild(row);
+                currentRows.push(sourceRow);
+                return;
+            }
+
+            state.current = createExportPage(root, headerTemplate);
+            startPart();
+
+            const nextTable = getInfoTable(getFirstInfoCard(frame));
+            nextTable.appendChild(row);
+            currentRows.push(sourceRow);
+        });
+
+        return true;
+    }
+
+    function splitInfoCardSection(sourceSection, state, root, headerTemplate) {
+        const cards = getDirectInfoCards(sourceSection);
+
+        if (!cards.length) {
+            return false;
+        }
+
+        for (let index = 0; index < cards.length; index += 1) {
+            const card = cards[index];
+            const section = buildSectionWithSingleInfoCard(sourceSection, card);
+
+            if (!section) {
+                continue;
+            }
+
+            if (index > 0) {
+                addContinuationLabel(section, index);
+            }
+
+            if (placeWholeItem(section, state, root, headerTemplate)) {
+                continue;
+            }
+
+            /* Saat section satu kartu masih terlalu tinggi, pecah per baris. */
+            if (splitSingleInfoCardRows(sourceSection, card, state, root, headerTemplate)) {
+                continue;
+            }
+
+            /* Fallback terukur: mulai card di halaman baru, bukan di sisa halaman. */
+            if (pageHasBodyContent(state.current)) {
+                state.current = createExportPage(root, headerTemplate);
+            }
+
+            state.current.body.appendChild(section.cloneNode(true));
+        }
+
+        return true;
+    }
+
+    function getReportTable(section) {
+        return Array.from(section.querySelectorAll('table.report-table')).find(function (table) {
+            return table.closest('.section-block') === section;
+        }) || null;
+    }
+
+    function buildEmptyReportSection(sourceSection) {
+        const section = sourceSection.cloneNode(true);
+        const table = getReportTable(section);
+
+        if (table) {
+            const body = table.querySelector('tbody');
+            if (body) {
+                body.innerHTML = '';
+            }
+        }
+
+        return section;
+    }
+
+    /* Tabel panjang dipecah per baris. Di setiap halaman baru dibuat section
+       lengkap yang memiliki border atas, heading, header tabel, dan label Lanjutan. */
+    function splitReportTableSection(sourceSection, state, root, headerTemplate) {
+        const sourceTable = getReportTable(sourceSection);
+
+        if (!sourceTable) {
+            return false;
+        }
+
+        const sourceRows = Array.from(sourceTable.querySelectorAll('tbody > tr'));
+
+        if (!sourceRows.length) {
+            return false;
+        }
+
+        let part = 0;
+        let frame = null;
+        let targetTableBody = null;
+
+        function beginPart(preferNewPage) {
+            if (preferNewPage) {
+                state.current = createExportPage(root, headerTemplate);
+            }
+
+            part += 1;
+            frame = buildEmptyReportSection(sourceSection);
+
+            if (part > 1) {
+                addContinuationLabel(frame, part - 1);
+            }
+
+            targetTableBody = getReportTable(frame).querySelector('tbody');
+            state.current.body.appendChild(frame);
+
+            /* Jika frame baru tidak muat pada sisa halaman, pindahkan frame utuh
+               ke halaman berikutnya. Kondisi halaman kosong tidak membuat page baru lagi. */
+            if (pageOverflows(state.current) && pageHasBodyContent(state.current)) {
+                frame.remove();
+                state.current = createExportPage(root, headerTemplate);
+                frame = buildEmptyReportSection(sourceSection);
+
+                if (part > 1) {
+                    addContinuationLabel(frame, part - 1);
+                }
+
+                targetTableBody = getReportTable(frame).querySelector('tbody');
+                state.current.body.appendChild(frame);
+            }
+        }
+
+        beginPart(false);
+
+        sourceRows.forEach(function (sourceRow) {
+            const row = sourceRow.cloneNode(true);
+            targetTableBody.appendChild(row);
+
+            if (!pageOverflows(state.current)) {
+                return;
+            }
+
+            row.remove();
+
+            /* Satu baris luar biasa tinggi tetap dipertahankan dalam frame baru,
+               karena tidak ada pemisahan aman di tengah isi satu baris. */
+            if (!targetTableBody.children.length) {
+                targetTableBody.appendChild(row);
+                return;
+            }
+
+            beginPart(true);
+            targetTableBody.appendChild(row);
+        });
+
+        return true;
+    }
+
+    function splitOversizedSection(sourceSection, state, root, headerTemplate) {
+        if (getReportTable(sourceSection)) {
+            return splitReportTableSection(sourceSection, state, root, headerTemplate);
+        }
+
+        if (getDirectInfoCards(sourceSection).length) {
+            return splitInfoCardSection(sourceSection, state, root, headerTemplate);
+        }
+
+        return false;
+    }
+
+    function addSourceItem(sourceItem, state, root, headerTemplate) {
+        if (placeWholeItem(sourceItem, state, root, headerTemplate)) {
+            return;
+        }
+
+        if (sourceItem.classList.contains('section-block') && splitOversizedSection(sourceItem, state, root, headerTemplate)) {
+            return;
+        }
+
+        /* Fallback: jangan meletakkan item besar di ujung halaman sebelumnya.
+           Item selalu mulai pada halaman baru agar tidak ada card tanpa border atas. */
+        if (pageHasBodyContent(state.current)) {
+            state.current = createExportPage(root, headerTemplate);
+        }
+
+        state.current.body.appendChild(sourceItem.cloneNode(true));
+    }
+
+    function removeEmptyPages(root) {
+        Array.from(root.querySelectorAll('.pegawai-export-page')).forEach(function (page) {
+            const body = page.querySelector('.pegawai-export-body');
+            if (!body || !body.children.length) {
+                page.remove();
+            }
+        });
+    }
+
+    async function buildExportPages(mode = 'pdf') {
+        const sourcePaper = getSourcePaper();
+
+        if (!sourcePaper) {
+            throw new Error('Area Detail Pegawai tidak ditemukan.');
+        }
+
+        const headerTemplate = sourcePaper.querySelector('.paper-header');
+        const bodySource = sourcePaper.querySelector('.paper-body');
+
+        if (!headerTemplate || !bodySource) {
+            throw new Error('Kop atau isi Detail Pegawai tidak ditemukan.');
+        }
+
+        await waitForFonts();
+        await waitForImages(sourcePaper);
+
+        const root = getOrCreateExportRoot();
+        resetExportRoot(root, mode);
+
+        const state = {
+            current: createExportPage(root, headerTemplate)
+        };
+
+        Array.from(bodySource.children)
+            .filter(function (node) { return node.nodeType === 1; })
+            .forEach(function (item) {
+                addSourceItem(item, state, root, headerTemplate);
+            });
+
+        removeEmptyPages(root);
+        await nextFrame();
+        await waitForImages(root);
+
+        const pages = Array.from(root.querySelectorAll('.pegawai-export-page'));
+
+        if (!pages.length) {
+            throw new Error('Tidak ada halaman yang dapat diexport.');
+        }
+
+        return { root: root, pages: pages };
+    }
+
+    function captureOptions(page) {
+        return {
+            margin: 0,
             image: { type: 'jpeg', quality: 1 },
             html2canvas: {
-                scale: 2.2,
+                scale: PDF_SCALE,
                 useCORS: true,
+                allowTaint: true,
                 backgroundColor: '#ffffff',
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                windowWidth: DESKTOP_CAPTURE_WIDTH,
+                windowHeight: Math.max(1600, page.scrollHeight)
             },
             jsPDF: {
                 unit: 'mm',
                 format: 'a4',
-                orientation: 'portrait'
+                orientation: 'portrait',
+                compress: true
             },
-            pagebreak: {
-                mode: ['css', 'legacy'],
-                avoid: ['.profile-hero', '.section-block', '.info-card', '.empty-state', '.document-footer', '.report-table tr']
-            }
+            pagebreak: { mode: [] }
         };
+    }
 
-        document.body.classList.add('pdf-exporting');
+    async function renderPageCanvas(page) {
+        const worker = window.html2pdf()
+            .set(captureOptions(page))
+            .from(page)
+            .toCanvas();
 
-        setTimeout(function () {
-            html2pdf()
-                .set(opt)
-                .from(element)
-                .save()
-                .then(() => {
-                    document.body.classList.remove('pdf-exporting');
-                    downloadBtn.disabled = false;
-                    downloadBtn.innerHTML = originalText;
-                })
-                .catch(() => {
-                    document.body.classList.remove('pdf-exporting');
-                    downloadBtn.disabled = false;
-                    downloadBtn.innerHTML = originalText;
-                    alert('Gagal membuat PDF. Coba lagi.');
-                });
-        }, 120);
+        return worker.get('canvas');
+    }
+
+    /* PDF dibangun secara satu-canvas = satu-halaman A4. Tidak menggunakan root
+       panjang, sehingga tidak ada halaman ekstra/blank akibat pembulatan page break. */
+    async function savePagesAsPdf(pages, filename) {
+        if (!pages.length) {
+            throw new Error('Tidak ada halaman PDF yang dapat dibuat.');
+        }
+
+        const firstCanvas = await renderPageCanvas(pages[0]);
+        const firstWorker = window.html2pdf()
+            .set(captureOptions(pages[0]))
+            .from(firstCanvas, 'canvas')
+            .toPdf();
+
+        const pdf = await firstWorker.get('pdf');
+
+        if (!pdf || typeof pdf.addImage !== 'function') {
+            throw new Error('Objek PDF internal tidak tersedia.');
+        }
+
+        /* html2pdf terkadang membentuk page tambahan kosong saat mengubah canvas
+           pertama. Hapus hanya page tambahan tersebut sebelum halaman berikutnya ditambah. */
+        if (typeof pdf.getNumberOfPages === 'function' && typeof pdf.deletePage === 'function') {
+            while (pdf.getNumberOfPages() > 1) {
+                pdf.deletePage(pdf.getNumberOfPages());
+            }
+        }
+
+        for (let index = 1; index < pages.length; index += 1) {
+            const canvas = await renderPageCanvas(pages[index]);
+            pdf.addPage('a4', 'portrait');
+            pdf.addImage(
+                canvas.toDataURL('image/jpeg', 1),
+                'JPEG',
+                0,
+                0,
+                A4_WIDTH_MM,
+                A4_HEIGHT_MM,
+                undefined,
+                'FAST'
+            );
+        }
+
+        pdf.save(filename);
+    }
+
+    /* Langsung ke dialog print native browser. Tidak membuka route, tab, atau
+       preview halaman A4 baru. Dialog browser tidak bisa dihilangkan secara paksa. */
+    function printPegawaiA4() {
+        /* Print memakai halaman aman 279mm, bukan canvas PDF 297mm.
+           Ini memberi buffer fisik atas dan bawah agar browser tidak
+           memotong card terakhir pada halaman. */
+        buildExportPages('print')
+            .then(function (result) {
+                document.body.classList.add('pegawai-printing');
+                result.root.style.left = '0';
+                result.root.style.top = '0';
+                result.root.style.zIndex = '2147483647';
+
+                const cleanup = function () {
+                    document.body.classList.remove('pegawai-printing');
+                    removeExportRoot();
+                    window.removeEventListener('afterprint', cleanup);
+                };
+
+                window.addEventListener('afterprint', cleanup);
+                setTimeout(function () { window.print(); }, 120);
+            })
+            .catch(function (error) {
+                console.error(error);
+                window.print();
+            });
+    }
+
+    window.printPegawaiA4 = printPegawaiA4;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const downloadButton = document.getElementById('downloadPdfBtn');
+
+        if (!downloadButton) {
+            return;
+        }
+
+        downloadButton.addEventListener('click', async function () {
+            const originalText = downloadButton.innerHTML;
+
+            downloadButton.disabled = true;
+            downloadButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Menyiapkan PDF...';
+
+            try {
+                await ensureHtml2Pdf();
+                const result = await buildExportPages('pdf');
+                const filename = @json('pegawai-' . $pegawai->nip . '-' . \Illuminate\Support\Str::slug($pegawai->nama ?? 'pegawai') . '.pdf');
+                await savePagesAsPdf(result.pages, filename);
+            } catch (error) {
+                console.error(error);
+                alert('PDF tidak dapat dibuat. Pastikan koneksi internet tersedia atau simpan html2pdf.bundle.min.js pada public/vendor/html2pdf/, kemudian refresh halaman.');
+            } finally {
+                removeExportRoot();
+                downloadButton.disabled = false;
+                downloadButton.innerHTML = originalText;
+            }
+        });
     });
-});
+})();
 </script>
 @endsection
