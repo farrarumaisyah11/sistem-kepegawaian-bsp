@@ -757,6 +757,10 @@
 
     {{-- Area ini khusus hasil susunan halaman untuk Print dan Download PDF. Jangan dihapus. --}}
     <div id="jabatan-export-root" class="jd-export-root" aria-hidden="true"></div>
+    {{-- Template tersembunyi: hanya dipakai ulang oleh Print/PDF pada setiap halaman A4. --}}
+    <div id="jd-corp-header-template" aria-hidden="true">
+        @include('jabatan._corp_header', ['j' => $j])
+    </div>
 </div>
 
 <style>
@@ -2528,500 +2532,813 @@ body.jd-exporting-a4 #jabatan-export-root{
     font-weight:700 !important;
 }
 
+
+
+/* ======================================================================
+   PRINT & PDF ENGINE ONLY
+   Tidak mengubah satu elemen pun pada tampilan Detail Jabatan di layar.
+   ====================================================================== */
+#jd-corp-header-template{
+    position:fixed !important;
+    left:-20000px !important;
+    top:0 !important;
+    width:210mm !important;
+    min-width:210mm !important;
+    visibility:visible !important;
+    pointer-events:none !important;
+    z-index:-9999 !important;
+}
+
+#jd-corp-header-template .jd-paper-header{
+    margin:0 !important;
+    width:210mm !important;
+}
+
+.jd-export-root{
+    position:fixed !important;
+    left:-20000px !important;
+    top:0 !important;
+    width:210mm !important;
+    min-width:210mm !important;
+    max-width:210mm !important;
+    margin:0 !important;
+    padding:0 !important;
+    background:#ffffff !important;
+    visibility:visible !important;
+    opacity:1 !important;
+    pointer-events:none !important;
+    z-index:-9999 !important;
+    overflow:visible !important;
+}
+
+.jd-export-page{
+    display:block !important;
+    width:210mm !important;
+    height:297mm !important;
+    min-height:297mm !important;
+    max-height:297mm !important;
+    margin:0 !important;
+    padding:0 !important;
+    box-sizing:border-box !important;
+    overflow:hidden !important;
+    background:#ffffff !important;
+    border:0 !important;
+    box-shadow:none !important;
+    page-break-after:always !important;
+    break-after:page !important;
+}
+
+.jd-export-page:last-child{
+    page-break-after:auto !important;
+    break-after:auto !important;
+}
+
+.jd-export-page .jd-paper-header{
+    width:210mm !important;
+    margin:0 !important;
+    padding:10mm 12mm 5mm 12mm !important;
+    box-sizing:border-box !important;
+    border-radius:0 !important;
+    border-bottom:1px solid var(--jd-border-strong) !important;
+    background:#ffffff !important;
+}
+
+.jd-export-page .jd-logo-box img{
+    width:56px !important;
+    height:56px !important;
+    max-width:56px !important;
+    max-height:56px !important;
+    object-fit:contain !important;
+}
+
+.jd-export-body{
+    padding:6mm 12mm 9mm 12mm !important;
+    box-sizing:border-box !important;
+    background:#ffffff !important;
+    overflow:visible !important;
+}
+
+.jd-export-body > :first-child{
+    margin-top:0 !important;
+}
+
+/* Mengunci layout desktop Detail Jabatan di canvas PDF/Print.
+   Tanpa ini, canvas A4 dianggap viewport < 992px dan tabel approval berubah vertikal. */
+.jd-export-root .jd-header-grid{
+    display:grid !important;
+    grid-template-columns:72px 1fr 72px !important;
+    gap:14px !important;
+    align-items:center !important;
+    text-align:initial !important;
+}
+
+.jd-export-root .jd-company-box{
+    text-align:center !important;
+}
+
+.jd-export-root .jd-grid-2{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:12px !important;
+    padding:14px !important;
+}
+
+.jd-export-root .jd-grid-1{
+    padding:0 14px 14px 14px !important;
+}
+
+.jd-export-root .jd-approval-summary-main{
+    display:flex !important;
+    flex-direction:row !important;
+    align-items:center !important;
+    gap:12px !important;
+}
+
+.jd-export-root .jd-approval-table{
+    display:table !important;
+    width:100% !important;
+    border-collapse:collapse !important;
+    table-layout:fixed !important;
+}
+
+.jd-export-root .jd-approval-table tbody{
+    display:table-row-group !important;
+}
+
+.jd-export-root .jd-approval-table tr{
+    display:table-row !important;
+}
+
+.jd-export-root .jd-approval-table th,
+.jd-export-root .jd-approval-table td{
+    display:table-cell !important;
+    width:auto !important;
+    vertical-align:top !important;
+}
+
+.jd-export-root .jd-approval-table th{
+    width:22% !important;
+    border-bottom:1px solid var(--jd-border) !important;
+}
+
+.jd-export-root .jd-profile-card,
+.jd-export-root .jd-section-block,
+.jd-export-root .jd-card,
+.jd-export-root .jd-footer-note,
+.jd-export-root .jd-approval-signoff,
+.jd-export-root .jd-avoid-break{
+    page-break-inside:avoid !important;
+    break-inside:avoid !important;
+}
+
+/* Card lanjutan selalu dimulai sebagai card baru penuh setelah header halaman. */
+.jd-export-root .jd-export-continuation{
+    margin-top:0 !important;
+}
+
+.jd-export-root .jd-continuation-label{
+    display:inline-flex !important;
+    align-items:center !important;
+    margin-left:8px !important;
+    padding:3px 8px !important;
+    border:1px solid var(--jd-border) !important;
+    border-radius:999px !important;
+    background:#ffffff !important;
+    color:#667085 !important;
+    font-size:9px !important;
+    font-weight:800 !important;
+    line-height:1 !important;
+    letter-spacing:.05em !important;
+    text-transform:uppercase !important;
+}
+
+.jd-export-root .jd-export-text-line{
+    margin:0 0 7px 0;
+}
+
+.jd-export-root .jd-export-text-line:last-child{
+    margin-bottom:0;
+}
+
+.jd-export-root .jd-paper-header,
+.jd-export-root .jd-paper-body,
+.jd-export-root .jd-profile-card,
+.jd-export-root .jd-chip,
+.jd-export-root .jd-section-block,
+.jd-export-root .jd-card,
+.jd-export-root .jd-title-wrap,
+.jd-export-root .jd-section-heading,
+.jd-export-root .jd-card-title,
+.jd-export-root .jd-meta-table th,
+.jd-export-root .jd-info-table th,
+.jd-export-root .jd-approval-table th,
+.jd-export-root .jd-approval-mini,
+.jd-export-root .jd-approval-badge,
+.jd-export-root .jd-approval-signoff{
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+}
+
+@page{
+    size:A4 portrait;
+    margin:0;
+}
+
+@media print{
+    html,
+    body{
+        width:210mm !important;
+        min-width:210mm !important;
+        margin:0 !important;
+        padding:0 !important;
+        background:#ffffff !important;
+        overflow:visible !important;
+        -webkit-print-color-adjust:exact !important;
+        print-color-adjust:exact !important;
+    }
+
+    body.jd-printing *{
+        visibility:hidden !important;
+    }
+
+    body.jd-printing #jabatan-export-root,
+    body.jd-printing #jabatan-export-root *{
+        visibility:visible !important;
+    }
+
+    body.jd-printing #jabatan-export-root{
+        display:block !important;
+        position:absolute !important;
+        left:0 !important;
+        top:0 !important;
+        width:210mm !important;
+        min-width:210mm !important;
+        background:#ffffff !important;
+        z-index:2147483647 !important;
+        overflow:visible !important;
+    }
+
+    body.jd-printing .jd-export-page{
+        display:block !important;
+        width:210mm !important;
+        height:297mm !important;
+        min-height:297mm !important;
+        max-height:297mm !important;
+        margin:0 !important;
+        padding:0 !important;
+        overflow:hidden !important;
+        border:0 !important;
+        box-shadow:none !important;
+    }
+}
+
 </style>
 
 @if(!$jabatanNotFound)
     <script src="{{ asset('vendor/html2pdf/html2pdf.bundle.min.js') }}"></script>
     <script>
-    (function () {
-        const A4_HEIGHT_MM = 297;
-        const MAX_PDF_SCALE = 2.25;
 
-        function ensureHtml2PdfLibrary() {
-            return new Promise(function (resolve, reject) {
-                if (window.html2pdf) {
-                    resolve();
-                    return;
-                }
+(function () {
+    'use strict';
 
-                const cdn = document.createElement('script');
-                cdn.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-                cdn.onload = function () {
-                    if (window.html2pdf) {
-                        resolve();
-                    } else {
-                        reject(new Error('html2pdf tidak tersedia'));
-                    }
-                };
-                cdn.onerror = reject;
-                document.head.appendChild(cdn);
+    const ROOT_ID = 'jabatan-export-root';
+    const HEADER_TEMPLATE_ID = 'jd-corp-header-template';
+    const CONTENT_ID = 'jabatan-content-source';
+    const PDF_SCALE = 2;
+    const DESKTOP_CANVAS_WIDTH = 1440;
+
+    function getRoot() { return document.getElementById(ROOT_ID); }
+    function getHeaderTemplate() {
+        const holder = document.getElementById(HEADER_TEMPLATE_ID);
+        return holder ? holder.querySelector('.jd-paper-header') : null;
+    }
+    function getContentSource() { return document.getElementById(CONTENT_ID); }
+
+    function waitForFonts() {
+        return document.fonts && document.fonts.ready
+            ? document.fonts.ready.catch(function () {})
+            : Promise.resolve();
+    }
+
+    function waitForImages(node) {
+        if (!node) return Promise.resolve();
+        const images = Array.from(node.querySelectorAll('img'));
+        return Promise.all(images.map(function (img) {
+            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+            return new Promise(function (resolve) {
+                const done = function () { resolve(); };
+                img.addEventListener('load', done, { once:true });
+                img.addEventListener('error', done, { once:true });
+                setTimeout(done, 5000);
             });
-        }
+        }));
+    }
 
-        function mmToPx(mm) {
-            const probe = document.createElement('div');
-            probe.style.position = 'absolute';
-            probe.style.left = '-99999px';
-            probe.style.top = '0';
-            probe.style.width = mm + 'mm';
-            probe.style.height = '1px';
-            document.body.appendChild(probe);
-            const px = probe.getBoundingClientRect().width;
-            probe.remove();
-            return px;
-        }
+    function ensureHtml2Pdf() {
+        if (window.html2pdf) return Promise.resolve();
+        return new Promise(function (resolve, reject) {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+            script.async = true;
+            script.onload = function () { window.html2pdf ? resolve() : reject(new Error('Library PDF tidak tersedia.')); };
+            script.onerror = function () { reject(new Error('Library PDF tidak dapat dimuat.')); };
+            document.head.appendChild(script);
+        });
+    }
 
-        function waitForImages(container) {
-            const images = Array.from(container.querySelectorAll('img'));
-            if (!images.length) return Promise.resolve();
+    function resetRoot(root) {
+        root.innerHTML = '';
+        root.style.left = '-20000px';
+        root.style.top = '0';
+        root.style.zIndex = '-9999';
+        root.style.visibility = 'visible';
+        root.style.opacity = '1';
+        root.style.display = 'block';
+    }
 
-            return Promise.all(images.map(function (img) {
-                if (img.complete && img.naturalWidth !== 0) {
-                    return Promise.resolve();
-                }
+    function clearRoot() {
+        const root = getRoot();
+        if (!root) return;
+        root.innerHTML = '';
+        root.style.left = '-20000px';
+        root.style.top = '0';
+        root.style.zIndex = '-9999';
+        root.style.visibility = 'visible';
+    }
 
-                return new Promise(function (resolve) {
-                    img.onload = resolve;
-                    img.onerror = resolve;
-                });
-            }));
-        }
+    function createPage(root, headerTemplate) {
+        const page = document.createElement('section');
+        page.className = 'jd-export-page';
 
-        function waitForFonts() {
-            if (document.fonts && document.fonts.ready) {
-                return document.fonts.ready.catch(function () {});
-            }
-            return Promise.resolve();
-        }
+        const header = headerTemplate.cloneNode(true);
+        header.removeAttribute('data-export-header');
 
-        function getJobDescriptionElement() {
-            return document.getElementById('jabatan-print-area');
-        }
+        const body = document.createElement('div');
+        body.className = 'jd-export-body';
 
-        function getExportRoot() {
-            return document.getElementById('jabatan-export-root');
-        }
+        page.appendChild(header);
+        page.appendChild(body);
+        root.appendChild(page);
 
-        function prepareRootForMeasure(root) {
-            root.innerHTML = '';
-            root.removeAttribute('aria-hidden');
-            root.style.position = 'fixed';
-            root.style.left = '0';
-            root.style.top = '0';
-            root.style.width = '210mm';
-            root.style.minWidth = '210mm';
-            root.style.maxWidth = '210mm';
-            root.style.visibility = 'hidden';
-            root.style.opacity = '1';
-            root.style.zIndex = '-1';
-            root.style.pointerEvents = 'none';
-            root.style.background = '#ffffff';
-            root.style.overflow = 'visible';
-        }
+        return { page:page, body:body };
+    }
 
-        function showRootForExport(root) {
-            root.removeAttribute('aria-hidden');
-            root.style.position = 'fixed';
-            root.style.left = '0';
-            root.style.top = '0';
-            root.style.width = '210mm';
-            root.style.minWidth = '210mm';
-            root.style.maxWidth = '210mm';
-            root.style.visibility = 'visible';
-            root.style.opacity = '1';
-            root.style.zIndex = '999999';
-            root.style.pointerEvents = 'none';
-            root.style.background = '#ffffff';
-            root.style.overflow = 'visible';
-        }
+    function isCurrentPageEmpty(state) {
+        return !state.current.body.children.length;
+    }
 
-        function hideRoot(root) {
-            if (!root) return;
-            root.setAttribute('aria-hidden', 'true');
-            root.style.position = 'fixed';
-            root.style.left = '-99999px';
-            root.style.top = '0';
-            root.style.visibility = 'hidden';
-            root.style.zIndex = '-1';
-            root.style.pointerEvents = 'none';
-            root.style.background = '#ffffff';
-        }
+    function pageOverflows(current) {
+        const pageBox = current.page.getBoundingClientRect();
+        const bodyBox = current.body.getBoundingClientRect();
+        const contentBottom = bodyBox.top + current.body.scrollHeight;
+        return contentBottom > pageBox.bottom + 0.5;
+    }
 
-        function visibleHeight(element) {
-            return Math.ceil(element.getBoundingClientRect().height);
-        }
+    function addContinuationLabel(section, partNumber) {
+        section.classList.add('jd-export-continuation');
+        const heading = section.querySelector('.jd-section-heading, .jd-card-title');
+        if (!heading || heading.querySelector('.jd-continuation-label')) return;
+        const label = document.createElement('span');
+        label.className = 'jd-continuation-label';
+        label.textContent = 'Lanjutan ' + partNumber;
+        heading.appendChild(label);
+    }
 
-        function createExportPage(root, headerSource) {
-            const page = document.createElement('div');
-            page.className = 'jd-export-page';
+    function addWholeItem(sourceItem, state, root, headerTemplate) {
+        let clone = sourceItem.cloneNode(true);
+        clone.classList.add('jd-export-item', 'jd-avoid-break');
+        state.current.body.appendChild(clone);
+        if (!pageOverflows(state.current)) return true;
 
-            const header = headerSource.cloneNode(true);
-            header.removeAttribute('data-export-header');
-
-            const body = document.createElement('div');
-            body.className = 'jd-export-body';
-
-            page.appendChild(header);
-            page.appendChild(body);
-            root.appendChild(page);
-
-            const pageHeight = mmToPx(A4_HEIGHT_MM);
-            const headerHeight = visibleHeight(header);
-            const bodyStyle = window.getComputedStyle(body);
-            const bodyPaddingTop = parseFloat(bodyStyle.paddingTop) || 0;
-            const bodyPaddingBottom = parseFloat(bodyStyle.paddingBottom) || 0;
-            const availableHeight = pageHeight - headerHeight - bodyPaddingTop - bodyPaddingBottom;
-
-            return {
-                page: page,
-                body: body,
-                availableHeight: Math.max(100, availableHeight)
-            };
-        }
-
-        function hasBodyContent(pageState) {
-            return pageState.body.children.length > 0;
-        }
-
-        function markContinuation(section, number) {
-            section.classList.add('jd-export-continuation');
-            const heading = section.querySelector('.jd-section-heading');
-            if (heading && !heading.querySelector('.jd-continuation-label')) {
-                const badge = document.createElement('span');
-                badge.className = 'jd-continuation-label';
-                badge.textContent = 'Lanjutan ' + number;
-                heading.appendChild(badge);
-            }
-        }
-
-        function cloneWithoutListItems(item) {
-            const clone = item.cloneNode(true);
-            const lists = clone.querySelectorAll('ol.jd-list, ul.jd-list');
-            lists.forEach(function (list) {
-                list.innerHTML = '';
-            });
-            return clone;
-        }
-
-        function findSplittableList(item) {
-            return item.querySelector('ol.jd-list, ul.jd-list');
-        }
-
-        function appendNormalItem(item, state, root, headerSource) {
-            let clone = item.cloneNode(true);
+        clone.remove();
+        if (!isCurrentPageEmpty(state)) {
+            state.current = createPage(root, headerTemplate);
+            clone = sourceItem.cloneNode(true);
             clone.classList.add('jd-export-item', 'jd-avoid-break');
             state.current.body.appendChild(clone);
+            if (!pageOverflows(state.current)) return true;
+            clone.remove();
+        }
+        return false;
+    }
 
-            if (state.current.body.scrollHeight > state.current.availableHeight && hasBodyContent(state.current)) {
-                clone.remove();
-                state.current = createExportPage(root, headerSource);
-                clone = item.cloneNode(true);
-                clone.classList.add('jd-export-item', 'jd-avoid-break');
+    function listIn(item) {
+        return item.querySelector('ol.jd-list, ul.jd-list');
+    }
+
+    function textBlockIn(item) {
+        return item.querySelector('.jd-text-block');
+    }
+
+    function cloneListFrame(sourceItem) {
+        const clone = sourceItem.cloneNode(true);
+        clone.querySelectorAll('ol.jd-list, ul.jd-list').forEach(function (list) { list.innerHTML = ''; });
+        return clone;
+    }
+
+    function splitLongList(sourceItem, state, root, headerTemplate) {
+        const sourceList = listIn(sourceItem);
+        if (!sourceList) return false;
+        const sourceEntries = Array.from(sourceList.children).filter(function (node) {
+            return node.tagName && node.tagName.toLowerCase() === 'li';
+        });
+        if (!sourceEntries.length) return false;
+
+        let part = 0;
+        let frame = null;
+        let destinationList = null;
+
+        function startPart(newPage) {
+            if (newPage) state.current = createPage(root, headerTemplate);
+            part += 1;
+            frame = cloneListFrame(sourceItem);
+            frame.classList.add('jd-export-item', 'jd-avoid-break');
+            if (part > 1) addContinuationLabel(frame, part - 1);
+            destinationList = listIn(frame);
+            state.current.body.appendChild(frame);
+
+            if (pageOverflows(state.current) && !isCurrentPageEmpty(state)) {
+                frame.remove();
+                state.current = createPage(root, headerTemplate);
+                frame = cloneListFrame(sourceItem);
+                frame.classList.add('jd-export-item', 'jd-avoid-break');
+                if (part > 1) addContinuationLabel(frame, part - 1);
+                destinationList = listIn(frame);
+                state.current.body.appendChild(frame);
+            }
+        }
+
+        startPart(false);
+        sourceEntries.forEach(function (sourceEntry) {
+            const entry = sourceEntry.cloneNode(true);
+            destinationList.appendChild(entry);
+            if (!pageOverflows(state.current)) return;
+
+            entry.remove();
+            if (!destinationList.children.length) {
+                // A single very long list entry is retained instead of creating an empty sheet.
+                destinationList.appendChild(entry);
+                return;
+            }
+
+            startPart(true);
+            destinationList.appendChild(entry);
+        });
+        return true;
+    }
+
+    function textChunks(text) {
+        const directLines = String(text || '').split(/\r?\n/).map(function (line) {
+            return line.trim();
+        }).filter(Boolean);
+        if (directLines.length > 1) return directLines;
+
+        const value = directLines.join(' ').trim();
+        if (!value) return [];
+        const sentences = value.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [value];
+        if (sentences.length > 1) return sentences.map(function (item) { return item.trim(); }).filter(Boolean);
+
+        const words = value.split(/\s+/);
+        const chunks = [];
+        for (let index = 0; index < words.length; index += 28) {
+            chunks.push(words.slice(index, index + 28).join(' '));
+        }
+        return chunks;
+    }
+
+    function splitLongText(sourceItem, state, root, headerTemplate) {
+        const originalBlock = textBlockIn(sourceItem);
+        if (!originalBlock) return false;
+        const chunks = textChunks(originalBlock.innerText);
+        if (!chunks.length) return false;
+
+        let part = 0;
+        let frame = null;
+        let block = null;
+
+        function startPart(newPage) {
+            if (newPage) state.current = createPage(root, headerTemplate);
+            part += 1;
+            frame = sourceItem.cloneNode(true);
+            frame.classList.add('jd-export-item', 'jd-avoid-break');
+            block = textBlockIn(frame);
+            block.innerHTML = '';
+            if (part > 1) addContinuationLabel(frame, part - 1);
+            state.current.body.appendChild(frame);
+        }
+
+        startPart(false);
+        chunks.forEach(function (chunk) {
+            const line = document.createElement('div');
+            line.className = 'jd-export-text-line';
+            line.textContent = chunk;
+            block.appendChild(line);
+            if (!pageOverflows(state.current)) return;
+
+            line.remove();
+            if (!block.children.length) {
+                block.appendChild(line);
+                return;
+            }
+            startPart(true);
+            block.appendChild(line);
+        });
+        return true;
+    }
+
+    function sectionWithOneCard(sourceSection, sourceCard) {
+        const section = sourceSection.cloneNode(true);
+        const grids = Array.from(section.querySelectorAll(':scope > .jd-grid-2, :scope > .jd-grid-1'));
+        grids.forEach(function (grid) {
+            grid.classList.remove('jd-grid-2');
+            grid.classList.add('jd-grid-1');
+            grid.innerHTML = '';
+        });
+        const destinationGrid = section.querySelector(':scope > .jd-grid-1');
+        if (destinationGrid) destinationGrid.appendChild(sourceCard.cloneNode(true));
+        return section;
+    }
+
+    function splitGridCards(sourceItem, state, root, headerTemplate) {
+        const cards = Array.from(sourceItem.querySelectorAll(':scope > .jd-grid-2 > .jd-card, :scope > .jd-grid-1 > .jd-card'));
+        if (!cards.length) return false;
+
+        cards.forEach(function (card, index) {
+            const section = sectionWithOneCard(sourceItem, card);
+            if (index > 0) addContinuationLabel(section, index);
+            if (addWholeItem(section, state, root, headerTemplate)) return;
+
+            if (listIn(section)) {
+                splitLongList(section, state, root, headerTemplate);
+            } else if (textBlockIn(section)) {
+                splitLongText(section, state, root, headerTemplate);
+            } else {
+                // Last-resort: one oversized card is kept on an occupied page. No empty A4 page is created.
+                const clone = section.cloneNode(true);
+                clone.classList.add('jd-export-item');
                 state.current.body.appendChild(clone);
             }
-        }
-
-        function appendSplitListSection(item, state, root, headerSource) {
-            const sourceList = findSplittableList(item);
-            if (!sourceList) {
-                appendNormalItem(item, state, root, headerSource);
-                return;
-            }
-
-            const sourceItems = Array.from(sourceList.children).filter(function (li) {
-                return li.tagName && li.tagName.toLowerCase() === 'li';
-            });
-
-            if (!sourceItems.length) {
-                appendNormalItem(item, state, root, headerSource);
-                return;
-            }
-
-            let continuationNo = 0;
-            let section = null;
-            let targetList = null;
-
-            function startSection(forceNewPage) {
-                if (forceNewPage || !state.current || (state.current.body.scrollHeight > 0 && state.current.body.scrollHeight > state.current.availableHeight)) {
-                    state.current = createExportPage(root, headerSource);
-                }
-
-                continuationNo += 1;
-                section = cloneWithoutListItems(item);
-                section.classList.add('jd-export-item', 'jd-avoid-break');
-                if (continuationNo > 1) {
-                    markContinuation(section, continuationNo - 1);
-                }
-                targetList = findSplittableList(section);
-                state.current.body.appendChild(section);
-
-                if (state.current.body.scrollHeight > state.current.availableHeight && state.current.body.children.length > 1) {
-                    section.remove();
-                    state.current = createExportPage(root, headerSource);
-                    section = cloneWithoutListItems(item);
-                    section.classList.add('jd-export-item', 'jd-avoid-break');
-                    if (continuationNo > 1) {
-                        markContinuation(section, continuationNo - 1);
-                    }
-                    targetList = findSplittableList(section);
-                    state.current.body.appendChild(section);
-                }
-            }
-
-            startSection(false);
-
-            sourceItems.forEach(function (sourceLi) {
-                const li = sourceLi.cloneNode(true);
-                targetList.appendChild(li);
-
-                if (state.current.body.scrollHeight > state.current.availableHeight) {
-                    li.remove();
-
-                    if (!targetList.children.length) {
-                        targetList.appendChild(li);
-                        return;
-                    }
-
-                    startSection(true);
-                    targetList.appendChild(li);
-                }
-            });
-        }
-
-        function appendSectionCardsIndividually(item, state, root, headerSource) {
-            const directCards = Array.from(item.querySelectorAll(':scope > .jd-grid-2 > .jd-card, :scope > .jd-grid-1 > .jd-card'));
-            if (!directCards.length) {
-                appendNormalItem(item, state, root, headerSource);
-                return;
-            }
-
-            let continuationNo = 0;
-
-            directCards.forEach(function (card, index) {
-                continuationNo += 1;
-                const section = item.cloneNode(true);
-                section.classList.add('jd-export-item', 'jd-avoid-break');
-
-                const grids = Array.from(section.querySelectorAll(':scope > .jd-grid-2, :scope > .jd-grid-1'));
-                grids.forEach(function (grid) {
-                    grid.classList.remove('jd-grid-2');
-                    grid.classList.add('jd-grid-1');
-                    grid.innerHTML = '';
-                });
-
-                const firstGrid = section.querySelector(':scope > .jd-grid-1');
-                if (firstGrid) {
-                    firstGrid.appendChild(card.cloneNode(true));
-                }
-
-                if (index > 0) {
-                    markContinuation(section, continuationNo - 1);
-                }
-
-                state.current.body.appendChild(section);
-                if (state.current.body.scrollHeight > state.current.availableHeight && state.current.body.children.length > 1) {
-                    section.remove();
-                    state.current = createExportPage(root, headerSource);
-                    state.current.body.appendChild(section);
-                }
-            });
-        }
-
-        function buildJabatanExportPages() {
-            const root = getExportRoot();
-            const source = getJobDescriptionElement();
-            const headerSource = source ? source.querySelector('[data-export-header="true"]') : null;
-            const contentSource = document.getElementById('jabatan-content-source');
-
-            if (!root || !source || !headerSource || !contentSource) {
-                return null;
-            }
-
-            prepareRootForMeasure(root);
-
-            const state = {
-                current: createExportPage(root, headerSource)
-            };
-
-            const items = Array.from(contentSource.children).filter(function (item) {
-                return item.nodeType === 1;
-            });
-
-            items.forEach(function (item) {
-                const isListSection = !!findSplittableList(item);
-                const hasCardGrid = item.querySelector(':scope > .jd-grid-2 > .jd-card, :scope > .jd-grid-1 > .jd-card');
-
-                if (isListSection) {
-                    appendSplitListSection(item, state, root, headerSource);
-                } else if (hasCardGrid) {
-                    appendSectionCardsIndividually(item, state, root, headerSource);
-                } else {
-                    appendNormalItem(item, state, root, headerSource);
-                }
-            });
-
-            return root;
-        }
-
-        function beforeA4Export(root) {
-            document.body.classList.add('jd-exporting-a4');
-            showRootForExport(root);
-        }
-
-        function afterA4Export() {
-            const root = getExportRoot();
-            document.body.classList.remove('jd-exporting-a4');
-            document.body.classList.remove('jd-printing');
-            hideRoot(root);
-        }
-
-        function openApprovalLogModal() {
-            const modal = document.getElementById('approvalLogModal');
-            if (!modal) return;
-            modal.classList.add('is-open');
-            modal.setAttribute('aria-hidden', 'false');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeApprovalLogModal() {
-            const modal = document.getElementById('approvalLogModal');
-            if (!modal) return;
-            modal.classList.remove('is-open');
-            modal.setAttribute('aria-hidden', 'true');
-            document.body.style.overflow = '';
-        }
-
-        function downloadApprovalLogCsv() {
-            const table = document.getElementById('approvalLogTable');
-            if (!table) return;
-
-            const rows = Array.from(table.querySelectorAll('tr'));
-            const csv = rows.map(function (row) {
-                return Array.from(row.querySelectorAll('th, td')).map(function (cell) {
-                    const text = (cell.innerText || '').replace(/\s+/g, ' ').trim();
-                    return '"' + text.replace(/"/g, '""') + '"';
-                }).join(',');
-            }).join('\n');
-
-            const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-
-            link.href = url;
-            link.download = 'riwayat-approval-jabatan-{{ $j->id_jabatan }}-{{ \Illuminate\Support\Str::slug($j->nama_jabatan ?? "jabatan") }}.csv';
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
-        }
-
-        window.printJabatanA4 = function () {
-            const root = buildJabatanExportPages();
-            if (!root) {
-                window.print();
-                return;
-            }
-
-            document.body.classList.add('jd-printing');
-            showRootForExport(root);
-
-            const cleanAfterPrint = function () {
-                afterA4Export();
-                window.removeEventListener('afterprint', cleanAfterPrint);
-            };
-
-            window.addEventListener('afterprint', cleanAfterPrint);
-
-            waitForFonts()
-                .then(function () { return waitForImages(root); })
-                .then(function () {
-                    setTimeout(function () { window.print(); }, 250);
-                });
-        };
-
-        function downloadJobDescriptionPdf(button) {
-            const originalText = button ? button.innerHTML : '';
-            if (button) {
-                button.disabled = true;
-                button.innerHTML = '<i class="bi bi-hourglass-split"></i> Menyiapkan PDF...';
-            }
-
-            ensureHtml2PdfLibrary()
-                .then(function () {
-                    const root = buildJabatanExportPages();
-                    if (!root) throw new Error('Area PDF tidak ditemukan.');
-                    beforeA4Export(root);
-                    return waitForFonts().then(function () { return waitForImages(root); }).then(function () { return root; });
-                })
-                .then(function (root) {
-                    const opt = {
-                        margin: 0,
-                        filename: 'job-description-{{ $j->id_jabatan }}-{{ \Illuminate\Support\Str::slug($j->nama_jabatan ?? "jabatan") }}.pdf',
-                        image: { type: 'jpeg', quality: 1 },
-                        html2canvas: {
-                            scale: MAX_PDF_SCALE,
-                            useCORS: true,
-                            allowTaint: true,
-                            backgroundColor: '#ffffff',
-                            scrollX: 0,
-                            scrollY: 0,
-                            windowWidth: root.scrollWidth,
-                            windowHeight: root.scrollHeight
-                        },
-                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-                        pagebreak: {
-                            mode: ['css', 'legacy'],
-                            before: ['.jd-export-page'],
-                            avoid: ['.jd-avoid-break', '.jd-profile-card', '.jd-section-block', '.jd-card', '.jd-footer-note', '.jd-approval-signoff']
-                        }
-                    };
-                    return html2pdf().set(opt).from(root).save();
-                })
-                .then(function () {
-                    afterA4Export();
-                    if (button) { button.disabled = false; button.innerHTML = originalText; }
-                })
-                .catch(function (error) {
-                    afterA4Export();
-                    if (button) { button.disabled = false; button.innerHTML = originalText; }
-                    alert('Gagal membuat PDF. Pastikan file public/vendor/html2pdf/html2pdf.bundle.min.js sudah ada, lalu refresh halaman.');
-                    console.error(error);
-                });
-        }
-
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('[data-jd-modal-open]').forEach(function (button) {
-                button.addEventListener('click', function () {
-                    const target = button.getAttribute('data-jd-modal-open');
-                    if (target === 'approvalLogModal') openApprovalLogModal();
-                });
-            });
-
-            document.querySelectorAll('[data-jd-modal-close]').forEach(function (button) {
-                button.addEventListener('click', closeApprovalLogModal);
-            });
-
-            const approvalLogModal = document.getElementById('approvalLogModal');
-            if (approvalLogModal) {
-                approvalLogModal.addEventListener('click', function (event) {
-                    if (event.target === approvalLogModal) closeApprovalLogModal();
-                });
-            }
-
-            document.addEventListener('keydown', function (event) {
-                if (event.key === 'Escape') closeApprovalLogModal();
-            });
-
-            const downloadLogCsvBtn = document.getElementById('downloadApprovalLogCsvBtn');
-            if (downloadLogCsvBtn) downloadLogCsvBtn.addEventListener('click', downloadApprovalLogCsv);
-
-
-            const downloadBtn = document.getElementById('downloadPdfBtn');
-            if (downloadBtn) {
-                downloadBtn.addEventListener('click', function () { downloadJobDescriptionPdf(downloadBtn); });
-            }
         });
-    })();
+        return true;
+    }
+
+    function addItem(sourceItem, state, root, headerTemplate) {
+        if (addWholeItem(sourceItem, state, root, headerTemplate)) return;
+        if (splitLongList(sourceItem, state, root, headerTemplate)) return;
+        if (splitLongText(sourceItem, state, root, headerTemplate)) return;
+        if (splitGridCards(sourceItem, state, root, headerTemplate)) return;
+
+        // Fallback without generating an empty page.
+        const clone = sourceItem.cloneNode(true);
+        clone.classList.add('jd-export-item');
+        state.current.body.appendChild(clone);
+    }
+
+    function removeEmptyPages(root) {
+        Array.from(root.querySelectorAll('.jd-export-page')).forEach(function (page) {
+            const body = page.querySelector('.jd-export-body');
+            if (body && !body.children.length) page.remove();
+        });
+    }
+
+    function buildPages() {
+        const root = getRoot();
+        const headerTemplate = getHeaderTemplate();
+        const source = getContentSource();
+        if (!root || !headerTemplate || !source) return null;
+
+        resetRoot(root);
+        const state = { current:createPage(root, headerTemplate) };
+        Array.from(source.children).filter(function (node) {
+            return node.nodeType === 1;
+        }).forEach(function (item) {
+            addItem(item, state, root, headerTemplate);
+        });
+        removeEmptyPages(root);
+        return root;
+    }
+
+    async function prepareExportPages() {
+        const headerTemplate = getHeaderTemplate();
+        const content = getContentSource();
+        await waitForFonts();
+        await waitForImages(headerTemplate);
+        await waitForImages(content);
+        const root = buildPages();
+        if (!root) throw new Error('Area Job Description tidak ditemukan.');
+        await waitForImages(root);
+        return root;
+    }
+
+    function captureOptions(page) {
+        return {
+            margin: 0,
+            image: { type:'jpeg', quality:1 },
+            html2canvas: {
+                scale: PDF_SCALE,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: DESKTOP_CANVAS_WIDTH,
+                windowHeight: Math.max(1600, page.scrollHeight)
+            },
+            jsPDF: { unit:'mm', format:'a4', orientation:'portrait', compress:true },
+            pagebreak: { mode: [] }
+        };
+    }
+
+    async function renderPageCanvas(page) {
+        const oldBreak = page.style.breakAfter;
+        const oldPageBreak = page.style.pageBreakAfter;
+        page.style.breakAfter = 'auto';
+        page.style.pageBreakAfter = 'auto';
+        try {
+            const worker = window.html2pdf().set(captureOptions(page)).from(page).toCanvas();
+            return await worker.get('canvas');
+        } finally {
+            page.style.breakAfter = oldBreak;
+            page.style.pageBreakAfter = oldPageBreak;
+        }
+    }
+
+    async function savePdf(pages, filename) {
+        if (!pages.length) throw new Error('Tidak ada halaman PDF yang dapat dibuat.');
+
+        /*
+        |------------------------------------------------------------------
+        | PDF TANPA GLOBAL jsPDF
+        |------------------------------------------------------------------
+        | html2pdf.bundle menyimpan jsPDF di dalam worker. Pada beberapa
+        | browser, bundle itu tidak mengekspos window.jspdf / window.jsPDF.
+        | Versi sebelumnya mencoba membaca global tersebut, lalu gagal dan
+        | catch menampilkan pesan seolah file library tidak ada.
+        |
+        | Sekarang PDF pertama dibuat dari CANVAS A4 lewat worker html2pdf,
+        | lalu objek PDF internalnya dipakai untuk menempel halaman berikutnya.
+        | Satu canvas = satu halaman A4, sehingga tidak ada pagination internal
+        | atau halaman kosong tambahan.
+        |------------------------------------------------------------------
+        */
+        const firstCanvas = await renderPageCanvas(pages[0]);
+
+        const firstWorker = window.html2pdf()
+            .set(captureOptions(pages[0]))
+            .from(firstCanvas, 'canvas')
+            .toPdf();
+
+        const pdf = await firstWorker.get('pdf');
+
+        if (!pdf || typeof pdf.addImage !== 'function') {
+            throw new Error('Objek PDF dari html2pdf tidak tersedia.');
+        }
+
+        // Canvas pertama harus menjadi tepat satu lembar A4.
+        // Jika browser/library menyisipkan page ekstra karena pembulatan pixel,
+        // page tambahan tersebut dibuang sebelum halaman berikutnya ditempel.
+        if (typeof pdf.getNumberOfPages === 'function' && typeof pdf.deletePage === 'function') {
+            while (pdf.getNumberOfPages() > 1) {
+                pdf.deletePage(pdf.getNumberOfPages());
+            }
+        }
+
+        for (let index = 1; index < pages.length; index += 1) {
+            const canvas = await renderPageCanvas(pages[index]);
+            pdf.addPage('a4', 'portrait');
+            pdf.addImage(
+                canvas.toDataURL('image/jpeg', 1),
+                'JPEG',
+                0,
+                0,
+                210,
+                297,
+                undefined,
+                'FAST'
+            );
+        }
+
+        pdf.save(filename);
+    }
+
+    function startPrint() {
+        prepareExportPages()
+            .then(function (root) {
+                document.body.classList.add('jd-printing');
+                root.style.left = '0';
+                root.style.top = '0';
+                root.style.zIndex = '2147483647';
+
+                const clean = function () {
+                    document.body.classList.remove('jd-printing');
+                    clearRoot();
+                    window.removeEventListener('afterprint', clean);
+                };
+                window.addEventListener('afterprint', clean);
+                setTimeout(function () { window.print(); }, 120);
+            })
+            .catch(function (error) {
+                console.error(error);
+                window.print();
+            });
+    }
+
+    window.printJabatanA4 = function () {
+        // Direct native browser print. It does not open a server print route or a separate A4 page.
+        startPrint();
+    };
+
+    async function downloadPdf(button) {
+        const originalButton = button ? button.innerHTML : '';
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i><span>Menyiapkan PDF...</span>';
+        }
+
+        try {
+            await ensureHtml2Pdf();
+            const root = await prepareExportPages();
+            const pages = Array.from(root.querySelectorAll('.jd-export-page'));
+            await savePdf(pages, 'job-description-{{ $j->id_jabatan }}-{{ \Illuminate\Support\Str::slug($j->nama_jabatan ?? "jabatan") }}.pdf');
+        } catch (error) {
+            console.error(error);
+            alert('PDF belum dapat dibuat. Periksa Console browser untuk detail error. Jika library PDF memang belum termuat, pastikan koneksi internet tersedia atau simpan html2pdf.bundle.min.js di public/vendor/html2pdf/.');
+        } finally {
+            clearRoot();
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = originalButton;
+            }
+        }
+    }
+
+    function openApprovalLogModal() {
+        const modal = document.getElementById('approvalLogModal');
+        if (!modal) return;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeApprovalLogModal() {
+        const modal = document.getElementById('approvalLogModal');
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    function downloadApprovalLogCsv() {
+        const table = document.getElementById('approvalLogTable');
+        if (!table) return;
+        const rows = Array.from(table.querySelectorAll('tr'));
+        const csv = rows.map(function (row) {
+            return Array.from(row.querySelectorAll('th,td')).map(function (cell) {
+                const text = (cell.innerText || '').replace(/\s+/g, ' ').trim();
+                return '"' + text.replace(/"/g, '""') + '"';
+            }).join(',');
+        }).join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type:'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'riwayat-approval-jabatan-{{ $j->id_jabatan }}-{{ \Illuminate\Support\Str::slug($j->nama_jabatan ?? "jabatan") }}.csv';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-jd-modal-open]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                if (button.getAttribute('data-jd-modal-open') === 'approvalLogModal') openApprovalLogModal();
+            });
+        });
+
+        document.querySelectorAll('[data-jd-modal-close]').forEach(function (button) {
+            button.addEventListener('click', closeApprovalLogModal);
+        });
+
+        const modal = document.getElementById('approvalLogModal');
+        if (modal) {
+            modal.addEventListener('click', function (event) {
+                if (event.target === modal) closeApprovalLogModal();
+            });
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') closeApprovalLogModal();
+        });
+
+        const pdfButton = document.getElementById('downloadPdfBtn');
+        if (pdfButton) pdfButton.addEventListener('click', function () { downloadPdf(pdfButton); });
+
+        const csvButton = document.getElementById('downloadApprovalLogCsvBtn');
+        if (csvButton) csvButton.addEventListener('click', downloadApprovalLogCsv);
+    });
+})();
+
     </script>
 @endif
 

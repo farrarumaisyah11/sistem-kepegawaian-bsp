@@ -276,7 +276,13 @@ class JabatanController extends Controller
 
     public function print(Jabatan $jabatan)
     {
-        $jabatan->load(['activeVersion', 'pendingVersion']);
+        // Relasi ini hanya dipakai untuk kebutuhan dokumen print, tidak mengubah workflow atau data jabatan.
+        $jabatan->load([
+            'activeVersion',
+            'pendingVersion',
+            'departemenMaster',
+            'parent.departemenMaster',
+        ]);
 
         return view('jabatan.print', compact('jabatan'));
     }
